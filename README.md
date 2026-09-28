@@ -1,4 +1,4 @@
-# Scrimside
+# Scrims Helper
 
 A fast, local-first scrim roster helper. Plain HTML, CSS, and JavaScript: no runtime dependencies, accounts, backend, or build step. The complete original request is preserved in [ORIGINAL_REQUEST.md](ORIGINAL_REQUEST.md).
 
@@ -60,19 +60,21 @@ Hover the Tank, DPS, or Support heading above the lineup to highlight players wi
 
 The **Playing as** dropdown remains available for explicit assignments, including off-roles; **Bench** sits a player out. Assigning an occupied slot automatically benches its previous player. Swaps and game undo show a temporary **Undo** action. The copy icon beside **⋯** copies a player's BattleTag in one click; it is disabled when no BattleTag is set. Click **⋯** to edit their details. Trial/team badges are informational and do not change counts or ordering.
 
-The **Playing as** dropdown includes off-role fills, marked with a pink badge and dropdown that explicitly says **off-role**. Dropdown assignments replace the destination and clear the player's previous slot; dragging onto an occupied slot swaps both players instead. Changes can be undone. The player's usual roles remain unchanged, and logged games count toward the role actually filled. Off-role lineups work with saved plans and backups too.
+The **Playing as** dropdown includes off-role fills, marked with a pink badge and dropdown that explicitly says **off-role**. Dropdown assignments replace the destination and clear the player's previous slot; dragging onto an occupied slot swaps both players instead. Changes can be undone. The player's usual roles remain unchanged, and logged games count toward the role actually filled. Off-role lineups survive backups too.
 
 To bench someone, right-click their player row or occupied lineup slot, or drag them outside the lineup strip and player rows. A **Drop to bench** hint confirms a bench drop before you release. Dropping onto another player swaps positions instead. Canceling a drag or dropping outside the browser does not bench them. **Undo** restores the assignment; attendance and game counts stay unchanged.
 
 Popups close when you click outside or press Escape. Player details save as you edit, including partially entered new players. Players without roles remain available under **Choose roles**. Clicking outside a confirmation cancels that action.
 
-Games and their recorded lineups are visible directly in the Games panel. Edit the scrim name and opponent BattleTag in the summary bar. The gear opens settings for a new scrim and import/export. The old Plans & history dialog is removed; existing saved plans remain preserved in backups for compatibility.
+Games and their recorded lineups are visible directly in the Games panel. Edit the scrim name and opponent BattleTag in the summary bar. The gear opens settings for a new scrim and import/export. The old Plans & history dialog and saved-plan field are removed. Original legacy saves remain available as recovery copies.
 
-Editing a player's opted-in roles keeps their current and planned assignments; any nonmatching current assignment appears as an off-role fill. Removing a player does not erase played-game history. Starting a new scrim retains the directory and clears this scrim's attendance, plans, and history; export first to retain a record.
+Editing a player's opted-in roles keeps their current assignment; any nonmatching current assignment appears as an off-role fill. Removing a player does not erase played-game history. Starting a new scrim retains the directory and clears this scrim's attendance, lineup, and history; export first to retain a record.
 
 ## Saving and sharing
 
-Changes automatically save to `localStorage` under `scrimside.v1`. **Export** downloads a JSON backup of the directory and current scrim. **Import** validates a backup and asks before replacing your current data. Backups are snapshots, not merges or live collaboration.
+Old Scrimside saves and preferences migrate automatically without overwriting the originals. The temporary legacy-key lookup is scheduled for code review/removal on October 12, 2026; it does not expire automatically. See [MIGRATIONS.md](MIGRATIONS.md) for recovery details and the cleanup checklist.
+
+Changes automatically save to `localStorage` under `scrims-helper.state` (format version 2). **Export** downloads a JSON backup of the directory and current scrim. **Import** validates a backup and asks before replacing your current data. Backups are snapshots, not merges or live collaboration.
 
 Data stays in your browser and is not sent to GitHub. Different devices, browsers, website origins, and private browsing sessions have separate storage. Clearing site data removes local saves. Export regularly, especially before starting a new scrim. Another tab changing saved data pauses writes in this tab; reload to use the latest saved state or export this tab first.
 

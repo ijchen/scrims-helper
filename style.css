@@ -1,16 +1,21 @@
 :root {
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #26382f;
-  background: #f4f5f1;
+  color-scheme: light;
+  color: #272b35;
+  background: #f2f3f6;
   font-synthesis: none;
   font-size: 14px;
-  --green: #254d3b;
-  --muted: #6c776f;
-  --line: #dce2d9;
-  --selected-bg: #eeeef1;
-  --selected-border: #898994;
-  --scroll-thumb: #a6aaa5;
-  --scroll-thumb-hover: #7c827c;
+  --canvas: #f2f3f6;
+  --surface: #ffffff;
+  --input: #f7f8fa;
+  --hover: #eceef2;
+  --green: #28765a;
+  --muted: #656c7b;
+  --line: #dce0e7;
+  --selected-bg: #edf0f5;
+  --selected-border: #8b95a6;
+  --scroll-thumb: #b2b8c3;
+  --scroll-thumb-hover: #858e9e;
 }
 
 * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
@@ -206,6 +211,8 @@ main { max-width: 1600px; padding: 18px 32px; margin: auto; }
 .role-games .bar-segment.filled { background: var(--role); }
 .edit-player { position: absolute; top: 7px; right: 5px; font-size: 18px; color: #798472; width: 26px; height: 29px; }
 .board-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 22px; font-size: 11px; color: var(--muted); padding: 20px 2px; }
+.creator-credit, .creator-credit:visited { color: var(--muted); text-decoration: none; }
+.creator-credit:hover { text-decoration: underline; text-underline-offset: 3px; }
 .games-section { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); scroll-margin-top: 20px; }
 .mode-tracker { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
 .mode-token { border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; font-size: 12px; font-weight: 600; }
@@ -219,6 +226,10 @@ main { max-width: 1600px; padding: 18px 32px; margin: auto; }
 [data-theme=dark] .game-entry { background: var(--surface); }
 .save-status { margin-left: auto; font-size: 10px; }
 .save-status::before { content: '●'; color: #849b6e; font-size: 8px; margin-right: 5px; }
+@media (min-width: 1100px) and (min-height: 1100px) {
+  .board-footer { font-size: 13px; }
+  .save-status { font-size: 12px; }
+}
 .empty-state { text-align: center; padding: 75px 20px; border: 1px dashed #c7d1bd; border-radius: 12px; background: #fafbf7; }
 .empty-icon { display: block; font-size: 38px; color: #92a282; margin-bottom: 12px; }
 .empty-state .primary { margin-top: 22px; }
@@ -270,6 +281,44 @@ legend { font-size: 12px; font-weight: 600; margin-bottom: 10px; }
 #toast button:hover { background: #3a5944; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 [hidden] { display: none !important; }
+
+[data-theme=light] button:not(:disabled):hover { background-color: var(--hover); }
+[data-theme=light] .brand { color: #303744; }
+[data-theme=light] .brand-mark { background: #303744; color: #ffffff; }
+[data-theme=light] .primary { background: #303744; color: #ffffff; }
+[data-theme=light] .primary:not(:disabled):hover { background: #454e60; }
+[data-theme=light] :is(input:not([type=checkbox]), select, textarea) { background: var(--input); color: #272b35; }
+[data-theme=light] ::placeholder { color: #7b8391; opacity: 1; }
+[data-theme=light] :is(button, a, input, select, textarea, summary):focus-visible,
+[data-theme=light] .attendance input:focus-visible+span { outline: 2px solid #7b8caa; outline-offset: 3px; }
+[data-theme=light] .scrim-summary { box-shadow: 0 2px 6px #27334d05; }
+[data-theme=light] :is(.player-card, dialog) { color: #272b35; border-color: var(--line); }
+[data-theme=light] .slot-name { color: #272b35; }
+[data-theme=light] .roster-row:hover { box-shadow: 0 2px 8px #27334d0c; }
+[data-theme=light] .player-card.selected { border-color: var(--selected-border); }
+[data-theme=light] :is(.copy-player, .edit-player) { color: var(--muted); }
+[data-theme=light] .attendance>span { border-color: #b6beca; color: #8993a3; }
+[data-theme=light] .attendance input:checked+span { border-color: var(--green); color: white; }
+[data-theme=light] .attendance:hover>span { box-shadow: 0 0 0 4px #28765a14; }
+[data-theme=light] :is(.bar-segment, .playtime-track:empty) { background: #e0e4eb; }
+[data-theme=light] .total-games { --bar-fill: #7b879b; }
+[data-theme=light] .total-games .bar-segment.filled { background: #7b879b; }
+[data-theme=light] .role-games .bar-segment.filled { background: var(--role); }
+[data-theme=light] .empty-state { background: #f9fafc; border-color: #c7ced9; }
+[data-theme=light] .empty-icon { color: #8b95a6; }
+[data-theme=light] dialog { background: var(--surface); box-shadow: 0 24px 80px #202b4533; }
+[data-theme=light] dialog::backdrop { background: #232b3c55; }
+[data-theme=light] #toast { background: #303744; box-shadow: 0 6px 25px #202b4526; }
+[data-theme=light] #toast button { color: #e1e8f6; }
+[data-theme=light] #toast button:hover { background: #454e60; }
+[data-theme=light] #bench-drop-hint { background: #303744; border-color: #bbc5d6; }
+[data-theme=light] .board.dragging .active-slot { background: #edf0f5; border-color: #9da9bb; }
+[data-theme=light] .board.dragging :is(.active-slot, .roster-row).drop-target { background: #e5eaf3; box-shadow: inset 0 0 0 2px #8b95a6; }
+[data-theme=light] .board.dragging :is(.active-slot, .roster-row).drop-target.off-role-target { background: #ffe4ee; box-shadow: inset 0 0 0 2px #b53c76; }
+[data-theme=light] .group-preview:not(:disabled):hover,
+[data-theme=light] .lineup-strip [data-empty-role]:hover { background: var(--tint); }
+[data-theme=light] .player-name-action:not(:disabled):hover { background: transparent; }
+[data-theme=light] .remove-player:not(:disabled):hover { color: #b33b51; background: #f9e3e7; }
 
 :root[data-theme=dark] { color-scheme: dark; color: #e7e7eb; background: var(--canvas); --canvas: #18191c; --surface: #232529; --input: #1c1e22; --hover: #34373e; --green: #37694d; --muted: #aeb1b9; --line: #40434b; --selected-bg: #303137; --selected-border: #92939f; }
 [data-theme=dark] :is(.topbar, .scrim-summary, .secondary, .player-card, dialog, .lineup-strip .active-slot) { background: var(--surface); color: #e7e7eb; border-color: var(--line); }
@@ -356,7 +405,7 @@ legend { font-size: 12px; font-weight: 600; margin-bottom: 10px; }
   .game-actions { margin-left: auto; }
   .board-meta { margin-top: 10px; }
   .board-footer { gap: 12px; }
-  .save-status { flex-basis: 100%; margin-left: 0; }
+  .save-status { flex-basis: 100%; margin-left: 0; text-align: right; }
   .card-name { font-size: 15px; }
 }
 

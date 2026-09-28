@@ -24,7 +24,7 @@ jobs:
       - name: Stage website files
         run: |
           mkdir _site
-          cp index.html app.js model.js catalog.js search.js games-ui.js style.css games.css .nojekyll _site/
+          cp index.html app.js model.js storage.js catalog.js search.js games-ui.js style.css games.css .nojekyll _site/
           cp -R assets _site/
       - uses: actions/upload-pages-artifact@v4
         with:

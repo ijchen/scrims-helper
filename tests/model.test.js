@@ -244,7 +244,7 @@ test('missing, absent, and duplicate players cannot be logged', () => {
   assert.equal(state.session.games.length, 0);
 });
 
-test('explicit off-role fills log their actual role and survive saved plans and backups', () => {
+test('explicit off-role fills log their actual role and survive backups', () => {
   const state = readyState();
   assignPlayer(state, 'FS', 'player-0', true);
   assert.equal(state.session.lineup.Tank, '');
@@ -253,7 +253,6 @@ test('explicit off-role fills log their actual role and survive saved plans and 
   assignPlayer(state, 'Tank', 'player-4', true);
   assert.equal(lineupStatus(state).ready, true);
   assert.deepEqual(lineupStatus(state).offRole, ['Tank', 'FS']);
-  state.session.plans.push({ id: 'fill-plan', label: '', lineup: { ...state.session.lineup } });
   recordGame(state, 'fill-game', new Date().toISOString());
   assert.equal(gamesFor(state, 'player-0', 'support'), 1);
   assert.equal(gamesFor(state, 'player-0', 'tank'), 0);
@@ -277,22 +276,19 @@ test('flex assignments move a player instead of occupying two slots', () => {
   assert.equal(state.session.lineup.Tank, '');
 });
 
-test('removing an attendee clears saved lineups while preserving played games', () => {
+test('removing an attendee clears the lineup while preserving played games', () => {
   const state = readyState();
   recordGame(state, 'game', new Date().toISOString());
-  state.session.plans.push({ id: 'plan', label: '', lineup: { ...state.session.lineup } });
   removeAttendee(state, 'player-0');
   assert.equal(state.session.lineup.Tank, '');
-  assert.equal(state.session.plans[0].lineup.Tank, '');
   assert.equal(gamesFor(state, 'player-0'), 1);
   assert.equal(state.players.length, 5);
   state.players = state.players.filter(player => player.id !== 'player-0');
   assert.doesNotThrow(() => validateBackup(state));
 });
 
-test('backups round-trip attendance, plans, and history without sharing references', () => {
+test('backups round-trip attendance and history without sharing references', () => {
   const state = readyState();
-  state.session.plans.push({ id: 'plan', label: 'First map', lineup: { ...state.session.lineup } });
   recordGame(state, 'game', new Date().toISOString());
   const restored = validateBackup(JSON.parse(JSON.stringify(state)));
   assert.deepEqual(restored, state);
@@ -302,7 +298,8 @@ test('backups round-trip attendance, plans, and history without sharing referenc
 
 test('malformed backups fail validation before replacing any state', () => {
   const mutations = [
-    state => { state.version = 2; },
+    state => { state.version = 999; },
+    state => { state.session.plans = []; },
     state => { state.players[0].roles = ['Unknown']; },
     state => { state.players[0].status = 'unknown'; },
     state => { state.players[0].name = ' '; },

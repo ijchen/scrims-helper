@@ -4,16 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#182922">
-  <title>Scrimside · Roster helper</title>
+  <title>Scrims Helper</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="games.css">
   <script type="module" src="app.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="./" aria-label="Scrimside home"><span class="brand-mark">S↗</span><span>scrimside</span></a>
+    <a class="brand" href="./" aria-label="Scrims Helper home"><span class="brand-mark">S↗</span><span>Scrims Helper</span></a>
     <nav aria-label="Scrim tools">
-      <button id="theme-toggle" class="icon-button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☾</button>
+      <button id="theme-toggle" class="icon-button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☀</button>
       <button id="settings-button" class="icon-button" aria-label="Settings and backups" title="Settings and backups">⚙</button>
     </nav>
   </header>
@@ -45,7 +46,7 @@
       <nav id="game-overview" class="game-history-selector" aria-label="Jump to a completed game" hidden></nav>
       <div id="game-rows" class="game-rows"></div>
     </section>
-    <div class="board-footer"><span id="save-status" class="save-status">Saved on this device</span></div>
+    <div class="board-footer"><a class="creator-credit" href="https://github.com/ijchen/scrims-helper" target="_blank" rel="noopener noreferrer">Made with ❤️ by Isaac Chen</a><span id="save-status" class="save-status">Saved on this device</span></div>
   </main>
 
   <dialog id="settings-dialog" aria-labelledby="settings-heading">

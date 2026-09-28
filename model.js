@@ -25,7 +25,8 @@ export function gameWarnings(session, game, id = '') {
 }
 
 export const ROLES = ['Tank', 'HSDPS', 'FDPS', 'MS', 'FS'];
-export const STORAGE_KEY = 'scrimside.v1';
+export const STORAGE_KEY = 'scrims-helper.state';
+export const STATE_VERSION = 2;
 export const MODES = ['Control', 'Push', 'Hybrid', 'Escort', 'Flashpoint'];
 export const OUTCOMES = ['win', 'loss', 'draw'];
 
@@ -85,11 +86,11 @@ export function emptyLineup() {
 }
 
 export function newSession() {
-  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), gameLabel: '', nextGame: emptyGameDetails(), activeGame: null, plans: [], games: [] };
+  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), gameLabel: '', nextGame: emptyGameDetails(), activeGame: null, games: [] };
 }
 
 export function newState() {
-  return { version: 1, players: [], session: newSession() };
+  return { version: STATE_VERSION, players: [], session: newSession() };
 }
 
 export function roleGroup(role) {
@@ -221,9 +222,7 @@ export function swapPlayers(state, firstId, secondId) {
 
 export function removeAttendee(state, playerId) {
   state.session.attendees = state.session.attendees.filter(attendee => attendee.playerId !== playerId);
-  for (const lineup of [state.session.lineup, ...state.session.plans.map(plan => plan.lineup)]) {
-    for (const role of ROLES) if (lineup[role] === playerId) lineup[role] = '';
-  }
+  for (const role of ROLES) if (state.session.lineup[role] === playerId) state.session.lineup[role] = '';
 }
 
 export function lineupStatus(state) {
@@ -308,13 +307,13 @@ export function recordGame(state, id, playedAt) {
 }
 
 export function validateBackup(input) {
-  const fail = () => { throw new Error('This file is not a valid Scrimside v1 backup. Nothing was changed.'); };
+  const fail = () => { throw new Error('This file is not a valid supported Scrims Helper backup. Nothing was changed.'); };
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const string = (value, max = 100) => typeof value === 'string' && value.length <= max;
   const list = (value, max) => Array.isArray(value) && value.length <= max;
   const identifier = value => string(value, 100) && value.length > 0;
   const unique = values => new Set(values).size === values.length;
-  if (!object(input) || input.version !== 1 || !list(input.players, 1000) || !object(input.session)) fail();
+  if (!object(input) || ![1, STATE_VERSION].includes(input.version) || !list(input.players, 1000) || !object(input.session)) fail();
   for (const player of input.players) {
     if (!object(player) || !identifier(player.id) || !string(player.name, 80) || !player.name.trim() || !string(player.battletag) || !string(player.notes, 500) || !list(player.roles, 5) || !unique(player.roles) || !player.roles.every(role => ROLES.includes(role))) fail();
     if (player.status !== undefined && !['default', 'trial', 'team'].includes(player.status)) fail();
@@ -327,7 +326,8 @@ export function validateBackup(input) {
     for (const field of ['ourBan', 'theirBan']) if (details[field] !== undefined && !string(details[field])) fail();
   };
   if (session.nextGame !== undefined) checkGameDetails(session.nextGame);
-  if (!string(session.title) || !string(session.contact) || !string(session.gameLabel) || !list(session.attendees, 1000) || !list(session.plans, 1000) || !list(session.games, 10000)) fail();
+  if (!string(session.title) || !string(session.contact) || !string(session.gameLabel) || !list(session.attendees, 1000) || !list(session.games, 10000)) fail();
+  if (input.version === 1 ? !list(session.plans, 1000) : session.plans !== undefined) fail();
   const playerIds = new Set(input.players.map(player => player.id));
   for (const attendee of session.attendees) {
     if (!object(attendee) || !playerIds.has(attendee.playerId) || typeof attendee.present !== 'boolean') fail();
@@ -339,11 +339,11 @@ export function validateBackup(input) {
     if (!unique(ROLES.map(role => lineup[role]).filter(Boolean))) fail();
   };
   checkLineup(session.lineup);
-  for (const plan of session.plans) {
+  for (const plan of session.plans || []) {
     if (!object(plan) || !identifier(plan.id) || !string(plan.label)) fail();
     checkLineup(plan.lineup);
   }
-  if (!unique(session.plans.map(plan => plan.id))) fail();
+  if (session.plans && !unique(session.plans.map(plan => plan.id))) fail();
   for (const game of [...session.games, ...(session.activeGame ? [session.activeGame] : [])]) {
     checkGameDetails(game);
     if (game.outcome !== undefined && game.outcome !== '' && !OUTCOMES.includes(game.outcome)) fail();
@@ -358,6 +358,8 @@ export function validateBackup(input) {
   if (session.activeGame && (!string(session.activeGame.startedAt) || !Number.isFinite(Date.parse(session.activeGame.startedAt)) || session.games.some(game => game.id === session.activeGame.id))) fail();
   if (!unique(session.games.map(game => game.id))) fail();
   const normalized = JSON.parse(JSON.stringify(input));
+  normalized.version = STATE_VERSION;
+  delete normalized.session.plans;
   for (const player of normalized.players) player.status ??= 'default';
   normalized.session.nextGame = { ...emptyGameDetails(), ...normalized.session.nextGame };
   normalized.session.activeGame ??= null;

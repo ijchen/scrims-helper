@@ -1,5 +1,6 @@
 import { ROLES, STORAGE_KEY, emptyLineup, newSession, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, lineupSwaps, autofillLineup, startGame, finishGame, reopenLastGame, cancelActiveGame, validateBackup } from './model.js';
 import { createGamesUI } from './games-ui.js';
+import { THEME_KEY, PANEL_SPLIT_KEY, readSavedState, restoreSavedState, readPreference, isStateStorageKey } from './storage.js';
 
 const element = id => document.getElementById(id);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
@@ -18,17 +19,17 @@ let focusedRole = '';
 let toastTimer;
 let storageBlocked = false;
 let rawBackup = null;
-const themeKey = 'scrimside.theme';
+const themeKey = THEME_KEY;
 let darkTheme = matchMedia('(prefers-color-scheme: dark)').matches;
 try {
-  const savedTheme = localStorage.getItem(themeKey);
+  const savedTheme = readPreference(localStorage, themeKey);
   if (savedTheme === 'dark' || savedTheme === 'light') darkTheme = savedTheme === 'dark';
 } catch {}
 
 function renderTheme() {
   document.documentElement.dataset.theme = darkTheme ? 'dark' : 'light';
   element('theme-toggle').setAttribute('aria-pressed', String(darkTheme));
-  element('theme-toggle').textContent = darkTheme ? '☀' : '☾';
+  element('theme-toggle').textContent = darkTheme ? '☾' : '☀';
   const label = darkTheme ? 'Switch to light theme' : 'Switch to dark theme';
   element('theme-toggle').setAttribute('aria-label', label);
   element('theme-toggle').title = label;
@@ -87,8 +88,8 @@ element('coin-flip').onclick = () => {
 };
 
 try {
-  rawBackup = localStorage.getItem(STORAGE_KEY);
-  if (rawBackup) state = validateBackup(JSON.parse(rawBackup));
+  rawBackup = readSavedState(localStorage);
+  if (rawBackup !== null) state = restoreSavedState(localStorage, rawBackup);
 } catch {
   storageBlocked = true;
   element('storage-warning').hidden = false;
@@ -514,7 +515,7 @@ document.addEventListener('click', async event => {
     const player = playerById(button.dataset.remove);
     const attendee = state.session.attendees.find(item => item.playerId === player?.id);
     if (!attendee || attendee.present) return;
-    const previous = structuredClone({ attendees: state.session.attendees, lineup: state.session.lineup, plans: state.session.plans });
+    const previous = structuredClone({ attendees: state.session.attendees, lineup: state.session.lineup });
     removeAttendee(state, player.id);
     commit();
     notify(`${player.name} removed from scrim.`, () => { Object.assign(state.session, previous); commit(); });
@@ -532,7 +533,7 @@ document.addEventListener('change', async event => {
   if (target.dataset.attendee) {
     const playerId = target.dataset.attendee;
     if (target.checked) state.session.attendees.push({ playerId, present: false });
-    else if (await confirmAction('Remove from this scrim?', 'This also clears this player from current and planned lineups. Their played games and directory entry are kept.', 'Remove')) removeAttendee(state, playerId);
+    else if (await confirmAction('Remove from this scrim?', 'This also clears this player from the lineup. Their played games and directory entry are kept.', 'Remove')) removeAttendee(state, playerId);
     commit();
     Array.from(document.querySelectorAll('[data-attendee]')).find(input => input.dataset.attendee === playerId)?.focus();
   }
@@ -679,7 +680,7 @@ element('player-form').onsubmit = event => {
 };
 element('delete-player').onclick = async () => {
   const playerId = element('player-id').value;
-  if (await confirmAction('Delete this player?', 'This removes the player from the directory, roster, and planned lineups. Past game records keep their original name.', 'Delete player')) {
+  if (await confirmAction('Delete this player?', 'This removes the player from the directory, roster, and lineup. Past game records keep their original name.', 'Delete player')) {
     removeAttendee(state, playerId);
     state.players = state.players.filter(player => player.id !== playerId);
     commit();
@@ -693,7 +694,7 @@ element('export-button').onclick = () => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `scrimside-${recovering ? 'recovery-' : ''}${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `scrims-helper-${recovering ? 'recovery-' : ''}${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   notify(recovering ? 'Original unreadable data exported for recovery.' : 'Backup exported. Import it on another device to pick up here.');
@@ -705,8 +706,10 @@ element('import-file').onchange = async event => {
   if (!file) return;
   try {
     if (file.size > 10 * 1024 * 1024) throw new Error('Backup is too large. Choose a file under 10 MB.');
-    const imported = validateBackup(JSON.parse(await file.text()));
-    if (await confirmAction('Replace your data with this backup?', `Import ${imported.players.length} players and ${imported.session.games.length} games. This replaces your current directory and scrim. Export your current data first if you need it.`, 'Import backup')) {
+    const input = JSON.parse(await file.text());
+    const imported = validateBackup(input);
+    const legacyPlansNotice = input.version === 1 && input.session.plans.length ? ' Saved lineup plans are no longer used and will not be imported; they remain in your original backup file.' : '';
+    if (await confirmAction('Replace your data with this backup?', `Import ${imported.players.length} players and ${imported.session.games.length} games. This replaces your current directory and scrim. Export your current data first if you need it.${legacyPlansNotice}`, 'Import backup')) {
       state = imported;
       storageBlocked = false;
       rawBackup = null;
@@ -717,7 +720,7 @@ element('import-file').onchange = async event => {
 };
 
 window.addEventListener('storage', event => {
-  if (event.key !== STORAGE_KEY && event.key !== null) return;
+  if (!isStateStorageKey(event.key)) return;
   storageBlocked = true;
   element('save-status').textContent = 'Another tab changed this scrim';
   element('storage-warning').hidden = false;
@@ -727,7 +730,7 @@ window.addEventListener('storage', event => {
 
 const gamesUI = createGamesUI({ getState: () => state, save: commit, action: gameAction, roleIcon });
 const divider = element('panel-divider');
-const splitKey = 'scrimside.panelSplit';
+const splitKey = PANEL_SPLIT_KEY;
 let panelSplit = 62;
 let resizePointer = null;
 function setPanelSplit(value, save = false) {
@@ -739,7 +742,7 @@ function setPanelSplit(value, save = false) {
   if (save) { try { localStorage.setItem(splitKey, String(panelSplit)); } catch {} }
 }
 try {
-  const saved = localStorage.getItem(splitKey);
+  const saved = readPreference(localStorage, splitKey);
   if (saved !== null && Number.isFinite(Number(saved))) panelSplit = Number(saved);
 } catch {}
 setPanelSplit(panelSplit);
