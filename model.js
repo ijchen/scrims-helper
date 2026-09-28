@@ -1,6 +1,40 @@
+import { MAPS, HEROES } from './catalog.js';
+import { findCatalogItem, normalizeSearch } from './search.js';
+
+export function gameWarnings(session, game, id = '') {
+  const timeline = [...session.games, ...(session.activeGame ? [session.activeGame] : [])];
+  const index = id ? timeline.findIndex(entry => entry.id === id) : timeline.length;
+  const previous = timeline.slice(0, Math.max(0, index));
+  const warnings = { label: [], ourBan: [], theirBan: [] };
+  const identity = (catalog, value) => findCatalogItem(catalog, value)?.id || normalizeSearch(value || '');
+  const map = identity(MAPS, game.label);
+  const mode = findCatalogItem(MAPS, game.label)?.mode || game.mode;
+  if (map && previous.some(entry => identity(MAPS, entry.label) === map)) warnings.label.push('Map already played');
+  if (mode && modeRotation(previous).played.includes(mode)) warnings.label.push('Mode already played this rotation');
+  for (const field of ['ourBan', 'theirBan']) {
+    const hero = identity(HEROES, game[field]);
+    if (hero && previous.some(entry => identity(HEROES, entry[field]) === hero)) warnings[field].push('Already banned by this team');
+  }
+  const ourRole = findCatalogItem(HEROES, game.ourBan)?.role;
+  const theirRole = findCatalogItem(HEROES, game.theirBan)?.role;
+  if (ourRole && ourRole === theirRole) {
+    warnings.ourBan.push('Both bans have the same role');
+    warnings.theirBan.push('Both bans have the same role');
+  }
+  return warnings;
+}
+
 export const ROLES = ['Tank', 'HSDPS', 'FDPS', 'MS', 'FS'];
 export const STORAGE_KEY = 'scrimside.v1';
 export const MODES = ['Control', 'Push', 'Hybrid', 'Escort', 'Flashpoint'];
+export const OUTCOMES = ['win', 'loss', 'draw'];
+
+export function setGameOutcome(state, gameId, outcome) {
+  if (outcome !== '' && !OUTCOMES.includes(outcome)) throw new Error('Unknown game result.');
+  const game = state.session.activeGame?.id === gameId ? state.session.activeGame : state.session.games.find(game => game.id === gameId);
+  if (!game) throw new Error('Game not found.');
+  game.outcome = outcome;
+}
 
 export function emptyGameDetails() {
   return { mode: '', ourBan: '', theirBan: '' };
@@ -10,8 +44,9 @@ export function modeRotation(games) {
   const played = new Set();
   let round = 1;
   for (const game of games) {
-    if (!MODES.includes(game.mode)) continue;
-    played.add(game.mode);
+    const mode = findCatalogItem(MAPS, game.label)?.mode || game.mode;
+    if (!MODES.includes(mode)) continue;
+    played.add(mode);
     if (played.size === MODES.length) {
       played.clear();
       round += 1;
@@ -25,7 +60,7 @@ export function emptyLineup() {
 }
 
 export function newSession() {
-  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), gameLabel: '', nextGame: emptyGameDetails(), plans: [], games: [] };
+  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), gameLabel: '', nextGame: emptyGameDetails(), activeGame: null, plans: [], games: [] };
 }
 
 export function newState() {
@@ -86,13 +121,73 @@ export function lineupStatus(state) {
   return { filled: selected.length, absent, offRole, ready: selected.length === 5 && new Set(selected).size === 5 && absent.length === 0 };
 }
 
-export function recordGame(state, id, playedAt) {
+function captureGame(state, id, playedAt) {
   if (!lineupStatus(state).ready) throw new Error('Choose five different players and mark them all present first.');
   const lineup = ROLES.map(role => {
     const player = state.players.find(person => person.id === state.session.lineup[role]);
     return { role, playerId: player.id, name: player.name, battletag: player.battletag };
   });
-  state.session.games.push({ id, label: state.session.gameLabel.trim(), ...state.session.nextGame, playedAt, lineup });
+  return { id, label: state.session.gameLabel.trim(), ...state.session.nextGame, mode: findCatalogItem(MAPS, state.session.gameLabel)?.mode || state.session.nextGame.mode, outcome: '', playedAt, lineup };
+}
+
+export function startGame(state, id, startedAt, markPresent = false) {
+  if (state.session.activeGame) throw new Error('Finish the current game first.');
+  const selected = new Set(Object.values(state.session.lineup));
+  const attendees = markPresent ? state.session.attendees.map(attendee => ({ ...attendee, present: attendee.present || selected.has(attendee.playerId) })) : state.session.attendees;
+  const game = captureGame({ ...state, session: { ...state.session, attendees } }, id, startedAt);
+  state.session.attendees = attendees;
+  state.session.activeGame = { ...game, startedAt };
+  state.session.gameLabel = '';
+  state.session.nextGame = emptyGameDetails();
+}
+
+export function finishGame(state, playedAt) {
+  if (!state.session.activeGame) throw new Error('Start a game first.');
+  const game = state.session.activeGame;
+  state.session.games.push({ ...game, playedAt });
+  state.session.activeGame = null;
+}
+
+export function reopenLastGame(state) {
+  if (state.session.activeGame) throw new Error('Finish or cancel the current game first.');
+  if (!state.session.games.length) throw new Error('No completed game to reopen.');
+  const game = state.session.games.pop();
+  state.session.activeGame = { ...game, startedAt: game.startedAt || game.playedAt };
+}
+
+export function cancelActiveGame(state) {
+  if (!state.session.activeGame) return;
+  const game = state.session.activeGame;
+  if (state.session.gameLabel || Object.values(state.session.nextGame).some(Boolean)) throw new Error('Clear the upcoming map and bans before returning this game to upcoming.');
+  state.session.gameLabel = game.label;
+  state.session.nextGame = { mode: game.mode, ourBan: game.ourBan, theirBan: game.theirBan };
+  for (const role of ROLES) {
+    const slot = game.lineup.find(slot => slot.role === role);
+    state.session.lineup[role] = state.session.attendees.some(attendee => attendee.playerId === slot.playerId) ? slot.playerId : '';
+  }
+  state.session.activeGame = null;
+}
+
+export function replaceGamePlayer(state, game, role, playerId) {
+  if (!ROLES.includes(role)) throw new Error('Unknown role.');
+  const target = game.lineup.find(slot => slot.role === role);
+  if (!target) throw new Error('Missing game slot.');
+  const existing = game.lineup.find(slot => slot.playerId === playerId);
+  if (existing) {
+    const previousRole = existing.role;
+    existing.role = role;
+    target.role = previousRole;
+  } else {
+    const player = state.players.find(player => player.id === playerId);
+    if (!player) throw new Error('Player not found.');
+    Object.assign(target, { playerId, name: player.name, battletag: player.battletag });
+  }
+  game.lineup.sort((first, second) => ROLES.indexOf(first.role) - ROLES.indexOf(second.role));
+}
+
+export function recordGame(state, id, playedAt) {
+  if (state.session.activeGame) throw new Error('Finish the current game first.');
+  state.session.games.push(captureGame(state, id, playedAt));
   state.session.gameLabel = '';
   state.session.nextGame = emptyGameDetails();
 }
@@ -134,19 +229,25 @@ export function validateBackup(input) {
     checkLineup(plan.lineup);
   }
   if (!unique(session.plans.map(plan => plan.id))) fail();
-  for (const game of session.games) {
+  for (const game of [...session.games, ...(session.activeGame ? [session.activeGame] : [])]) {
     checkGameDetails(game);
+    if (game.outcome !== undefined && game.outcome !== '' && !OUTCOMES.includes(game.outcome)) fail();
     if (!object(game) || !identifier(game.id) || !string(game.label) || !string(game.playedAt) || !Number.isFinite(Date.parse(game.playedAt)) || !list(game.lineup, 5) || game.lineup.length !== 5) fail();
     for (const slot of game.lineup) {
       if (!object(slot) || !ROLES.includes(slot.role) || !identifier(slot.playerId) || !string(slot.name, 80) || !slot.name.trim() || !string(slot.battletag)) fail();
     }
     if (!unique(game.lineup.map(slot => slot.role)) || !unique(game.lineup.map(slot => slot.playerId))) fail();
+    if (game.startedAt !== undefined && (!string(game.startedAt) || !Number.isFinite(Date.parse(game.startedAt)))) fail();
   }
+  if (session.activeGame !== undefined && session.activeGame !== null && !object(session.activeGame)) fail();
+  if (session.activeGame && (!string(session.activeGame.startedAt) || !Number.isFinite(Date.parse(session.activeGame.startedAt)) || session.games.some(game => game.id === session.activeGame.id))) fail();
   if (!unique(session.games.map(game => game.id))) fail();
   const normalized = JSON.parse(JSON.stringify(input));
   for (const player of normalized.players) player.status ??= 'default';
   normalized.session.nextGame = { ...emptyGameDetails(), ...normalized.session.nextGame };
-  for (const game of normalized.session.games) {
+  normalized.session.activeGame ??= null;
+  for (const game of [...normalized.session.games, ...(normalized.session.activeGame ? [normalized.session.activeGame] : [])]) {
+    game.outcome ??= '';
     for (const [field, value] of Object.entries(emptyGameDetails())) game[field] ??= value;
   }
   return normalized;

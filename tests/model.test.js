@@ -1,6 +1,129 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ROLES, MODES, modeRotation, newState, newSession, gamesFor, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, recordGame, validateBackup } from '../model.js';
+import { ROLES, MODES, modeRotation, newState, newSession, gamesFor, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, recordGame, startGame, finishGame, reopenLastGame, cancelActiveGame, replaceGamePlayer, setGameOutcome, validateBackup } from '../model.js';
+
+test('results survive finish, edits and backups without changing playtime', () => {
+  const state = readyState();
+  startGame(state, 'result', '2026-09-27T12:00:00Z');
+  setGameOutcome(state, 'result', 'win');
+  assert.equal(gamesFor(state, 'player-0'), 0);
+  finishGame(state, '2026-09-27T12:10:00Z');
+  assert.equal(state.session.games[0].outcome, 'win');
+  setGameOutcome(state, 'result', 'loss');
+  assert.equal(gamesFor(state, 'player-0'), 1);
+  assert.deepEqual(validateBackup(state), state);
+  setGameOutcome(state, 'result', 'draw');
+  assert.equal(validateBackup(state).session.games[0].outcome, 'draw');
+  setGameOutcome(state, 'result', '');
+  assert.equal(state.session.games[0].outcome, '');
+  assert.throws(() => setGameOutcome(state, 'result', 'other'));
+  assert.throws(() => setGameOutcome(state, 'missing', 'win'));
+  delete state.session.games[0].outcome;
+  assert.equal(validateBackup(state).session.games[0].outcome, '');
+  state.session.games[0].outcome = 'other';
+  assert.throws(() => validateBackup(state));
+});
+
+test('reopening removes credit and preserves both the snapshot and upcoming draft', () => {
+  const state = readyState();
+  state.session.gameLabel = 'Ilios';
+  recordGame(state, 'done', '2026-09-27T12:00:00Z');
+  state.session.gameLabel = 'Dorado';
+  reopenLastGame(state);
+  assert.equal(state.session.games.length, 0);
+  assert.equal(state.session.activeGame.label, 'Ilios');
+  assert.equal(state.session.gameLabel, 'Dorado');
+  assert.equal(gamesFor(state, 'player-0'), 0);
+  assert.throws(() => reopenLastGame(state));
+  assert.deepEqual(validateBackup(state), state);
+  finishGame(state, '2026-09-27T12:10:00Z');
+  assert.equal(gamesFor(state, 'player-0'), 1);
+});
+
+test('start captures a lineup without crediting it; finish credits that snapshot once', () => {
+  const state = readyState();
+  state.session.gameLabel = "King's Row";
+  state.session.nextGame.ourBan = 'Ana';
+  startGame(state, 'live', '2026-09-27T12:00:00Z');
+  assert.equal(state.session.games.length, 0);
+  assert.equal(gamesFor(state, 'player-0'), 0);
+  assert.equal(state.session.activeGame.mode, 'Hybrid');
+  assert.equal(state.session.activeGame.ourBan, 'Ana');
+  assert.equal(state.session.gameLabel, '');
+  assert.throws(() => startGame(state, 'other', '2026-09-27T12:00:00Z'));
+  assert.throws(() => recordGame(state, 'other', '2026-09-27T12:00:00Z'));
+  assignPlayer(state, 'Tank', '');
+  state.session.attendees[0].present = false;
+  const restored = validateBackup(state);
+  finishGame(restored, '2026-09-27T12:10:00Z');
+  assert.equal(restored.session.activeGame, null);
+  assert.equal(gamesFor(restored, 'player-0'), 1);
+  assert.equal(restored.session.games[0].lineup[0].playerId, 'player-0');
+  assert.throws(() => finishGame(restored, '2026-09-27T12:11:00Z'));
+});
+
+test('confirmed start marks only the chosen five present and does not credit games yet', () => {
+  const state = readyState();
+  state.session.attendees.forEach(attendee => { attendee.present = false; });
+  state.players.push({ id: 'bench', name: 'Bench', battletag: '', roles: ['Tank'], status: 'default', notes: '' });
+  state.session.attendees.push({ playerId: 'bench', present: false });
+  assert.throws(() => startGame(state, 'start', '2026-09-27T12:00:00Z'));
+  startGame(state, 'start', '2026-09-27T12:00:00Z', true);
+  assert.equal(state.session.attendees.filter(attendee => attendee.present).length, 5);
+  assert.equal(state.session.attendees.at(-1).present, false);
+  assert.equal(state.session.games.length, 0);
+  assert.deepEqual(validateBackup(state), state);
+});
+
+test('confirmed start never marks attendance on an incomplete lineup', () => {
+  const state = readyState();
+  state.session.attendees.forEach(attendee => { attendee.present = false; });
+  state.session.lineup.Tank = '';
+  const before = structuredClone(state);
+  assert.throws(() => startGame(state, 'start', '2026-09-27T12:00:00Z', true));
+  assert.deepEqual(state, before);
+});
+
+test('returning an active game to upcoming preserves metadata and guards another draft', () => {
+  const state = readyState();
+  state.session.gameLabel = 'Ilios';
+  startGame(state, 'live', '2026-09-27T12:00:00Z');
+  state.session.gameLabel = 'Dorado';
+  assert.throws(() => cancelActiveGame(state));
+  state.session.gameLabel = '';
+  cancelActiveGame(state);
+  assert.equal(state.session.gameLabel, 'Ilios');
+  assert.equal(state.session.nextGame.mode, 'Control');
+  assert.equal(state.session.games.length, 0);
+});
+
+test('historical lineup corrections swap duplicates, update credit and preserve snapshots', () => {
+  const state = readyState();
+  recordGame(state, 'done', '2026-09-27T12:00:00Z');
+  const game = state.session.games[0];
+  replaceGamePlayer(state, game, 'Tank', 'player-4');
+  assert.equal(gamesFor(state, 'player-4', 'tank'), 1);
+  assert.equal(gamesFor(state, 'player-0', 'support'), 1);
+  state.players.push({ id: 'new', name: 'Sub', battletag: 'Sub#1', roles: ['Tank'], status: 'default', notes: '' });
+  replaceGamePlayer(state, game, 'Tank', 'new');
+  assert.equal(gamesFor(state, 'player-4'), 0);
+  assert.equal(gamesFor(state, 'new'), 1);
+  assert.equal(state.session.lineup.Tank, 'player-0');
+  assert.deepEqual(validateBackup(state), state);
+  assert.throws(() => replaceGamePlayer(state, game, 'Tank', 'missing'));
+});
+
+test('legacy games remain completed and malformed active snapshots are rejected', () => {
+  const state = readyState();
+  recordGame(state, 'done', '2026-09-27T12:00:00Z');
+  delete state.session.activeGame;
+  assert.equal(validateBackup(state).session.activeGame, null);
+  assert.equal(validateBackup(state).session.games.length, 1);
+  state.session.activeGame = { ...state.session.games[0], startedAt: 'bad' };
+  assert.throws(() => validateBackup(state));
+  state.session.activeGame.startedAt = '2026-09-27T12:00:00Z';
+  assert.throws(() => validateBackup(state));
+});
 
 test('game details persist, clear for the next game, and migrate old backups', () => {
   const state = readyState();

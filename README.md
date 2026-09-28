@@ -16,9 +16,17 @@ Open <http://localhost:4173>. Use an HTTP server rather than opening `index.html
 
 ### Maps and bans
 
-Below the roster, **Games** shows an editable next-game row and each logged game (newest first). Enter a mode, map name, and one hero ban per team. Everything autosaves; **Log game +1** records these details with the five players and starts a blank next-game row. The map field stays in sync with the top-bar map/note. Logged rows can be corrected without changing player counts.
+Below the roster, **Games** separates **Upcoming** (dashed border), **In progress** (amber border), and **Completed** cards. Every card shows the map image, both banned heroes, and all five players. Click a map or ban to change it; **Edit** also lets you correct who played each role. Historical lineup corrections update total and role-specific playtime automatically without changing the current lineup.
 
-The mode tracker crosses off modes from logged games and starts a fresh rotation after all five modes have been played. Repeated modes count only once per rotation; games without a mode are ignored. Editing a logged mode or undoing a game recalculates the rotation. Map and hero names are free text for now—no enforced map pools or ban rules. Existing backups work, and new exports include these details.
+The roster and games scroll independently on landscape displays. All completed games appear newest-first below the active/upcoming game. The horizontal overview stays chronological (Game 1 onward); click a thumbnail to scroll to that game. **Prepare next game** reveals the upcoming planning card during a live game. **Win / Loss / Draw** finish the active game and count playtime. Results remain editable afterward; click the selected result again to clear it. The W/L/D summary counts completed games only. Portrait/narrow displays keep a stacked page layout.
+
+On landscape displays at least 1100px wide, roster and games sit side by side within the viewport. Header, lineup slots, and game controls stay visible; long rosters or expanded game details scroll inside their own panels. Portrait and smaller windows retain the stacked layout.
+
+**Start game** captures the chosen five and the map/bans without adding playtime. **Finish game +1** credits that captured lineup, even if you have already started arranging the next five. You can prepare the next map and bans while a game is in progress. **Back to upcoming** undoes a start; it asks you to clear any separately prepared upcoming map/bans first rather than overwriting them. The most recent completed game's editor has **Mark in progress** to reverse an early finish. All stages and edits autosave and survive reloads.
+
+Map/hero pickers show images and support case/accent-insensitive search, common abbreviations (`kr`, `gib`, `brig`, `76`), partial names, and small typos. Arrow keys and Enter work too. Known maps set their mode automatically. Custom names remain possible; set a custom map's mode through **Details/Edit**. The local catalog and bundled images are documented in [ASSETS.md](ASSETS.md); map pools and ban-role rules are not enforced yet.
+
+The mode tracker uses completed games only and starts a fresh rotation after all five modes have been played. Repeated modes count once per rotation. Map corrections, reopening, and undo recalculate it. Existing backups remain compatible: old logged games become completed cards, not drafts.
 
 The overview bar keeps the contact BattleTag (edit and one-click copy), next map/note, attendance, and games played on the main screen. Edits save automatically. Click the games-played count to open the log.
 
@@ -28,8 +36,8 @@ Dark mode uses neutral **Charcoal**. Switch themes using the sun/moon button bes
 
 1. Open **+ Players** to create players or check existing ones into this scrim. Choose their roles and **Default**, **Trial**, or **Team member** status.
 2. Each player has one row, with present players first and then fewest games. Click anywhere on their strip to put them in: a single usual role is chosen immediately; for flex players, a single open eligible slot is chosen automatically. If several are open, they highlight with dashed borders while other slots and players dim; if none are open, all their usual roles highlight. Pick beside the player's name or in the lineup strip. Nothing shifts during selection. Attendance, assignment dropdowns, copy, and edit controls keep their separate actions. Clicking an already-assigned player leaves them in place. Escape or clicking their strip again cancels a choice.
-3. Toggle the circle beside a name to mark attendance. Planning works before players arrive; logging needs five different, present players.
-4. Click **Log game +1** after a game. The selected five each gain a game; their lineup stays selected. Each row shows a total-games bar plus smaller bars for every group they play: tank, DPS (HSDPS + FDPS), and support (MS + FS). Current off-role assignments and groups with past games also appear. All bars share a scale of `max(5, games logged this scrim)`, with one segment per game. Numbers show exact counts, using the roles recorded in past games. **Undo game** updates all bars immediately. Sorting puts present players first, then fewest total games, then trials before everyone else, then alphabetical order. Absent players always stay at the bottom.
+3. Toggle the circle beside a name to mark attendance. Absent players have dimmed rows and a **Not here** badge. Planning never changes attendance automatically. With five slots filled, **Start game** remains available even if attendance is missing: it lists those players and offers **Mark them here & start**. Cancel, Escape, or clicking outside leaves everything unchanged; unselected players are never marked present by this action.
+4. Click **Start game** when the five enter the match, then **Finish game +1** afterward. Only completed games count. Each row shows total games plus smaller bars for tank, DPS (HSDPS + FDPS), and support (MS + FS). All bars share a scale of `max(5, games completed this scrim)`. **Undo game** updates the counts immediately. Sorting puts present players first, then fewest total games, then trials, then alphabetical order.
 
 The roster always shows everyone, with one row per player. Use the role-heading hover previews to find eligible players without hiding anyone.
 
@@ -63,7 +71,7 @@ Website: <https://ijchen.github.io/scrims-helper/>
 
 In repository **Settings → Pages**, set the source to **GitHub Actions**. Pushing to `master` runs the model tests and deploys the website through `.github/workflows/pages.yml`. You can also run that workflow manually from the Actions tab.
 
-Only the HTML, CSS, JavaScript, and `.nojekyll` are included in the deployed artifact. All asset paths are relative, so repository-subpath hosting works without configuration. Never commit roster backups or secrets.
+Only website HTML, CSS, JavaScript, bundled map/hero images, and `.nojekyll` are included in the deployed artifact. All asset paths are relative, so repository-subpath hosting works without configuration. Never commit roster backups or secrets.
 
 To move your existing local roster to the hosted website, **Export** from your local app, open the website, then **Import** that file. The two origins have separate browser storage; updates to the website do not erase its saved roster.
 
@@ -79,8 +87,7 @@ On NixOS, use your existing Node environment or `nix shell nixpkgs#nodejs` first
 
 ## Next iterations
 
-- Map board for Control, Push, Hybrid, Escort, and Flashpoint, with mode locking and five-mode rotation resets.
-- Map/hero pickers, configurable map pools, and ban role-conflict feedback.
+- Configurable map pools and ban role-conflict feedback.
 - Hero pool images or specialist details if they prove useful later.
 
 These are intentionally deferred while the roster workflow gets real scrim use.

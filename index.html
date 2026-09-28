@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#182922">
   <title>Scrimside · Roster helper</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="games.css">
   <script type="module" src="app.js"></script>
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="./" aria-label="Scrimside home"><span class="brand-mark">S↗</span><span>scrimside</span></a>
-    <button id="session-settings" class="session-name" title="Scrim settings"><span id="session-display">Scrim</span> <span aria-hidden="true">⌄</span></button>
     <nav aria-label="Scrim tools">
       <button id="directory-button" class="secondary">+ Players</button>
       <button id="plans-button" class="quiet">Plans & history</button>
@@ -23,27 +23,28 @@
   <main>
     <div id="storage-warning" class="warning" hidden></div>
     <section class="scrim-summary" aria-label="Scrim overview">
+      <div class="summary-name"><label for="session-title">Scrim name</label><input id="session-title" maxlength="100" placeholder="Thursday practice" autocomplete="off"></div>
       <div class="summary-contact"><label for="contact">Contact Battle.net</label><div class="summary-input"><input id="contact" maxlength="100" placeholder="BattleTag#1234" autocomplete="off" spellcheck="false"><button id="copy-contact" class="secondary" aria-label="Copy contact BattleTag" title="Copy contact BattleTag"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg>Copy</button></div></div>
-      <div class="summary-map"><label for="game-label">Next map / note</label><input id="game-label" maxlength="100" placeholder="Map or plan name"></div>
       <div class="summary-stat"><strong id="present-count">0 / 0</strong><span>players here</span></div>
-      <button id="history-button" class="summary-stat" title="View game log"><strong id="game-count">0</strong><span>games played ↗</span></button>
+      <div class="summary-stat"><span class="summary-games-line"><strong id="game-count">0</strong><span id="games-record" aria-label="Completed game results"></span></span><span>games played</span></div>
       <div class="quick-tools"><button id="copy-scrim-code" class="secondary" title="Copy scrim code" aria-label="Copy scrim code DKEEH">DKEEH <span aria-hidden="true">⧉</span></button><button id="coin-flip" class="secondary" title="Flip a coin"><span aria-hidden="true">◉</span> <span id="coin-result" aria-live="polite">Flip coin</span></button></div>
     </section>
-    <section class="live-toolbar" aria-label="Current game">
+    <section class="live-toolbar" aria-label="Lineup controls">
       <div class="game-heading"><h1>Game <span id="next-number">1</span></h1><span id="lineup-status" role="status"></span></div>
-      <div class="game-actions"><button id="clear-lineup" class="quiet" title="Bench all five players">Clear lineup</button><button id="undo-game" class="quiet" title="Undo last logged game">↶ Undo game</button><button id="log-game" class="primary">✓ Log game <span>+1</span></button></div>
+      <div class="game-actions"><button id="clear-lineup" class="quiet" title="Bench all five players">Clear lineup</button></div>
     </section>
     <section id="board" class="board" aria-label="Lineup and roster">
       <div id="lineup-strip" class="lineup-strip" aria-label="Next game's five slots"></div>
-      <div id="roster-summary" class="muted small"></div>
       <span id="role-choice-text" class="sr-only" role="status"></span>
       <div class="roster-head" aria-hidden="true"><span>Here</span><span>Player / roles</span><span>Playing as</span><span>Games played</span><span></span></div>
       <div id="player-roster" class="player-roster" aria-label="Players"></div>
     </section>
     <section id="empty-roster" class="empty-state" hidden><span class="empty-icon" aria-hidden="true">+</span><h2>Add your players</h2><button id="add-players" class="primary">+ Players</button></section>
+    <div id="panel-divider" role="separator" tabindex="0" aria-label="Resize roster and games" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="62" aria-controls="board games-section" title="Drag to resize · Arrow keys to adjust · Double-click to reset"></div>
     <section id="games-section" class="games-section" aria-labelledby="games-heading">
-      <div class="section-title"><h2 id="games-heading">Games</h2></div>
+      <div class="section-title"><h2 id="games-heading">Games</h2><button id="undo-game" class="quiet" title="Undo last completed game">↶ Undo game</button></div>
       <div id="mode-tracker" class="mode-tracker" aria-label="Map mode rotation"></div>
+      <nav id="game-overview" class="game-history-selector" aria-label="Jump to a completed game" hidden></nav>
       <div id="game-rows" class="game-rows"></div>
     </section>
     <div class="board-footer"><span id="save-status" class="save-status">Saved on this device</span></div>
@@ -51,7 +52,6 @@
 
   <dialog id="settings-dialog" aria-labelledby="settings-heading">
     <div class="dialog-heading"><h2 id="settings-heading">Scrim settings</h2><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
-    <label class="field">Scrim name<input id="session-title" maxlength="100" placeholder="Thursday practice"></label>
     <div class="settings-section"><h3>Backup</h3><div class="button-row"><button id="export-button" class="secondary">↓ Export</button><button id="import-button" class="secondary">↑ Import</button><input id="import-file" type="file" accept="application/json,.json" hidden></div><p class="muted small">Saved in this browser. Export to keep or share a copy.</p></div>
     <div class="dialog-footer"><button id="new-session" class="quiet danger">New scrim</button><button class="primary" data-close="settings-dialog">Done</button></div>
   </dialog>
@@ -86,6 +86,18 @@
     </form>
   </dialog>
   <dialog id="confirm-dialog"><h2 id="confirm-title"></h2><p id="confirm-description" class="muted"></p><div class="dialog-footer"><button id="confirm-cancel" class="secondary">Cancel</button><button id="confirm-accept" class="primary">Continue</button></div></dialog>
+  <dialog id="game-editor" aria-labelledby="game-editor-heading">
+    <div class="dialog-heading"><h2 id="game-editor-heading">Edit game</h2><button class="icon-button" data-close="game-editor" aria-label="Close game editor">×</button></div>
+    <div id="game-editor-fields"></div>
+    <h3 class="editor-roster-heading">Players who played</h3><div id="game-editor-roster"></div>
+    <div class="dialog-footer"><button id="reopen-game" class="quiet" hidden>Mark in progress</button><span class="muted small">Edits save automatically and update playtime.</span><button class="primary" data-close="game-editor">Done</button></div>
+  </dialog>
+  <dialog id="catalog-dialog" aria-labelledby="catalog-heading">
+    <div class="dialog-heading"><h2 id="catalog-heading">Choose map</h2><button class="icon-button" data-close="catalog-dialog" aria-label="Close picker">×</button></div>
+    <input id="catalog-search" type="search" maxlength="100" autocomplete="off" spellcheck="false" aria-label="Search maps or heroes" aria-controls="catalog-results">
+    <div id="catalog-filters" class="catalog-filters"></div><div id="catalog-results" class="catalog-results"></div>
+    <div class="catalog-footer"><button id="catalog-clear" class="quiet">Clear selection</button><button id="catalog-custom" class="quiet" hidden></button></div>
+  </dialog>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <div id="bench-drop-hint" role="status" hidden>↓ Drop to bench</div>
 </body>

@@ -1,4 +1,5 @@
-import { ROLES, MODES, STORAGE_KEY, modeRotation, emptyLineup, newSession, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, recordGame, validateBackup } from './model.js';
+import { ROLES, STORAGE_KEY, emptyLineup, newSession, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, startGame, finishGame, reopenLastGame, cancelActiveGame, validateBackup } from './model.js';
+import { createGamesUI } from './games-ui.js';
 
 const element = id => document.getElementById(id);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
@@ -8,6 +9,7 @@ const statusBadge = player => player.status && player.status !== 'default' ? `<s
 const uid = () => crypto.randomUUID();
 let state = newState();
 let logLocked = false;
+let attendancePromptOpen = false;
 let draggedPlayerId = '';
 let choosingPlayerId = '';
 let hoveredRole = '';
@@ -131,8 +133,9 @@ function playerById(playerId) {
 }
 
 function sortedAttendees() {
+  const activePlayers = new Set(state.session.activeGame?.lineup.map(slot => slot.playerId) || []);
   return [...state.session.attendees].sort((first, second) => {
-    const difference = gamesFor(state, first.playerId) - gamesFor(state, second.playerId);
+    const difference = gamesFor(state, first.playerId) + Number(activePlayers.has(first.playerId)) - gamesFor(state, second.playerId) - Number(activePlayers.has(second.playerId));
     const firstPlayer = playerById(first.playerId);
     const secondPlayer = playerById(second.playerId);
     return Number(second.present) - Number(first.present) || difference || Number(secondPlayer.status === 'trial') - Number(firstPlayer.status === 'trial') || firstPlayer.name.localeCompare(secondPlayer.name);
@@ -148,9 +151,10 @@ function roleIcon(group) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">${paths[group]}</svg>`;
 }
 
-function gameBar(count, label, className, capacity) {
-  const segments = Array.from({ length: capacity }, (_, index) => `<span class="bar-segment ${index < count ? 'filled' : ''}"></span>`).join('');
-  return `<span class="game-bar ${className}" aria-label="${count} ${label} games" title="${count} ${label} games · ${capacity} game scale"><small>${label}</small><span class="playtime-track" style="--segments:${Math.max(1, capacity)}" aria-hidden="true">${segments}</span><strong>${count}</strong></span>`;
+function gameBar(count, label, className, capacity, inProgress = false) {
+  const segments = Array.from({ length: capacity }, (_, index) => `<span class="bar-segment ${index < count ? 'filled' : inProgress && index === count ? 'in-progress' : ''}"></span>`).join('');
+  const description = `${count} ${label} games${inProgress ? ' · 1 in progress' : ''}`;
+  return `<span class="game-bar ${className}" aria-label="${description}" title="${description} · ${capacity} game scale"><small>${label}</small><span class="playtime-track" style="--segments:${Math.max(1, capacity)}" aria-hidden="true">${segments}</span><strong>${count}</strong></span>`;
 }
 
 function copyPlayerButton(player) {
@@ -161,22 +165,24 @@ function playerCard(attendee) {
   const player = playerById(attendee.playerId);
   const assignedRole = ROLES.find(slot => state.session.lineup[slot] === player.id);
   const group = roleGroup(assignedRole) || roleGroup(player.roles[0]) || 'tank';
-  const barGroups = ['tank', 'dps', 'support'].filter(barGroup => player.roles.some(role => roleGroup(role) === barGroup) || roleGroup(assignedRole) === barGroup || gamesFor(state, player.id, barGroup) > 0);
+  const activeSlot = state.session.activeGame?.lineup.find(slot => slot.playerId === player.id);
+  const activeGroup = roleGroup(activeSlot?.role);
+  const barGroups = ['tank', 'dps', 'support'].filter(barGroup => player.roles.some(role => roleGroup(role) === barGroup) || roleGroup(assignedRole) === barGroup || activeGroup === barGroup || gamesFor(state, player.id, barGroup) > 0);
   const groupLabels = { tank: 'tank', dps: 'DPS', support: 'supp' };
-  const capacity = Math.max(5, state.session.games.length);
+  const capacity = Math.max(5, state.session.games.length + Number(Boolean(state.session.activeGame)));
   const offRole = assignedRole && !player.roles.includes(assignedRole);
   const option = role => `<option value="${role}" ${assignedRole === role ? 'selected' : ''}>${role}${player.roles.includes(role) ? '' : ' (off-role)'}</option>`;
   const usual = ROLES.filter(role => player.roles.includes(role));
   const fills = ROLES.filter(role => !player.roles.includes(role));
   const choices = choosingPlayerId === player.id ? assignmentChoices(state, player.id) : [];
-  return `<article class="player-card roster-row ${roleGroup(assignedRole) || group} ${assignedRole ? 'selected' : ''} ${offRole ? 'off-role' : ''} ${choices.length ? 'choosing' : ''}" data-player-card="${escapeHtml(player.id)}">
+  return `<article class="player-card roster-row ${roleGroup(assignedRole) || group} ${attendee.present ? '' : 'not-present'} ${assignedRole ? 'selected' : ''} ${offRole ? 'off-role' : ''} ${choices.length ? 'choosing' : ''}" data-player-card="${escapeHtml(player.id)}">
     <div class="attendance-cell"><label class="attendance" title="${attendee.present ? 'Here' : 'Not here'}"><input type="checkbox" data-present="${escapeHtml(player.id)}" ${attendee.present ? 'checked' : ''} aria-label="${escapeHtml(player.name)} is present"><span aria-hidden="true">${attendee.present ? '✓' : '−'}</span></label>${assignedRole ? `<span class="lineup-badge ${roleGroup(assignedRole)} ${offRole ? 'unusual' : ''}" role="img" aria-label="Playing ${assignedRole}${offRole ? ' (off-role)' : ''}" title="Playing ${assignedRole}${offRole ? ' (off-role)' : ''}">${roleIcon(roleGroup(assignedRole))}${offRole ? '<span class="role-alert" aria-hidden="true">!</span>' : ''}</span>` : ''}</div>
     <div class="player-info" draggable="true" data-pick-player="${escapeHtml(player.id)}" title="${escapeHtml(player.battletag)} · Drag to a lineup slot">
-      <button class="player-name-action" data-quick-assign="${escapeHtml(player.id)}" aria-label="Put ${escapeHtml(player.name)} in the lineup"><span class="card-name">${escapeHtml(player.name)} ${statusBadge(player)}</span></button>
+      <button class="player-name-action" data-quick-assign="${escapeHtml(player.id)}" aria-label="Put ${escapeHtml(player.name)} in the lineup"><span class="card-name">${escapeHtml(player.name)} ${statusBadge(player)}${attendee.present ? '' : '<span class="away-badge">Not here</span>'}</span></button>
       <span class="card-roles">${player.roles.map(role => choices.includes(role) ? `<button class="role-chip role-choice ${roleGroup(role)}" data-choice-role="${role}" data-choice-player="${escapeHtml(player.id)}" aria-label="Play ${escapeHtml(player.name)} as ${role}">${role}</button>` : `<span class="role-chip ${roleGroup(role)}">${role}</span>`).join('') || '<span class="muted small">No roles set</span>'}</span>
     </div>
     <label class="assignment-control"><span>Playing as</span><select data-assignment="${escapeHtml(player.id)}" aria-label="Playing as for ${escapeHtml(player.name)}"><option value="" ${!assignedRole ? 'selected' : ''}>Bench</option>${usual.length ? `<optgroup label="Usual roles">${usual.map(option).join('')}</optgroup>` : ''}${fills.length ? `<optgroup label="Fill (off-role)">${fills.map(option).join('')}</optgroup>` : ''}</select></label>
-    <div class="playtime">${gameBar(gamesFor(state, player.id), 'total', 'total-games', capacity)}${barGroups.map(barGroup => gameBar(gamesFor(state, player.id, barGroup), groupLabels[barGroup], `role-games ${barGroup}`, capacity)).join('')}</div>
+    <div class="playtime">${gameBar(gamesFor(state, player.id), 'total', 'total-games', capacity, Boolean(activeSlot))}${barGroups.map(barGroup => gameBar(gamesFor(state, player.id, barGroup), groupLabels[barGroup], `role-games ${barGroup}`, capacity, activeGroup === barGroup)).join('')}</div>
     <div class="row-actions">${copyPlayerButton(player)}<button class="edit-player" data-edit="${escapeHtml(player.id)}" title="Edit ${escapeHtml(player.name)}" aria-label="Edit ${escapeHtml(player.name)}">⋯</button></div>
   </article>`;
 }
@@ -202,12 +208,9 @@ function renderBoard() {
     </button>`;
   }).join('')}</div>`).join('');
   element('player-roster').innerHTML = attendees.map(playerCard).join('');
-  element('roster-summary').textContent = `${attendees.length} players · Here first · Fewest games first`;
   const status = lineupStatus(state);
-  element('lineup-status').textContent = status.filled < 5 ? `${status.filled}/5 selected` : status.absent.length ? `${status.absent.length} away` : '✓ Ready';
+  element('lineup-status').textContent = `${state.session.activeGame ? 'Next lineup · ' : ''}${status.filled < 5 ? `${status.filled}/5 selected` : status.absent.length ? `${status.absent.length} not marked here` : '✓ Ready'}`;
   element('lineup-status').classList.toggle('ready', status.ready);
-  element('log-game').disabled = !status.ready || logLocked;
-  element('log-game').title = status.ready ? 'Add one game to the selected five' : status.filled < 5 ? 'Select a player in each role' : 'Mark the selected five as here';
   element('save-plan').disabled = status.filled !== 5;
   element('clear-lineup').disabled = status.filled === 0;
   if (focusKey) {
@@ -276,47 +279,15 @@ function renderDirectory() {
   element('directory-list').innerHTML = players.length ? players.map(player => `<div class="directory-row"><label class="directory-person"><input type="checkbox" data-attendee="${escapeHtml(player.id)}" ${state.session.attendees.some(attendee => attendee.playerId === player.id) ? 'checked' : ''}><span><strong>${escapeHtml(player.name)} ${statusBadge(player)}</strong><small>${escapeHtml(player.battletag || 'No BattleTag')} · ${player.roles.join(' / ')}</small></span></label><button class="quiet" data-edit="${escapeHtml(player.id)}" aria-label="Edit ${escapeHtml(player.name)}">Edit</button></div>`).join('') : `<div class="empty-small"><p>${state.players.length ? 'No matching players.' : 'Your regulars, all in one place.'}</p><span>${state.players.length ? 'Try another name or role.' : 'Create a player to add them to your directory and this scrim.'}</span></div>`;
 }
 
-function renderModeTracker() {
-  const rotation = modeRotation(state.session.games);
-  element('mode-tracker').innerHTML = MODES.map(mode => `<span class="mode-token ${rotation.played.includes(mode) ? 'played' : ''}" title="${mode}: ${rotation.played.includes(mode) ? 'already played this rotation' : 'not played this rotation'}">${rotation.played.includes(mode) ? '✓ ' : ''}${mode}</span>`).join('');
-}
-
 function renderGames() {
-  renderModeTracker();
-  const rows = [{ ...state.session.nextGame, label: state.session.gameLabel, id: '', number: state.session.games.length + 1 }, ...state.session.games.map((game, index) => ({ ...game, number: index + 1 })).reverse()];
-  element('game-rows').innerHTML = rows.map(game => `<article class="game-entry ${game.id ? '' : 'upcoming'}" data-game-entry="${escapeHtml(game.id)}">
-    <div class="game-entry-number"><strong>Game ${game.number}</strong><small>${game.id ? 'Logged' : 'Next game'}</small></div>
-    <label>Mode<select data-game-field="mode" aria-label="Game ${game.number} mode"><option value="">Choose mode</option>${MODES.map(mode => `<option ${game.mode === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label>
-    <label>Map<input data-game-field="label" maxlength="100" placeholder="Map name" value="${escapeHtml(game.label)}" aria-label="Game ${game.number} map"></label>
-    <label>Our hero ban<input data-game-field="ourBan" maxlength="100" placeholder="Hero name" value="${escapeHtml(game.ourBan)}" aria-label="Game ${game.number} our hero ban"></label>
-    <label>Their hero ban<input data-game-field="theirBan" maxlength="100" placeholder="Hero name" value="${escapeHtml(game.theirBan)}" aria-label="Game ${game.number} their hero ban"></label>
-  </article>`).join('');
+  gamesUI.render();
 }
-
-element('game-rows').addEventListener('input', event => {
-  const field = event.target.dataset.gameField;
-  if (!['mode', 'label', 'ourBan', 'theirBan'].includes(field)) return;
-  const gameId = event.target.closest('[data-game-entry]').dataset.gameEntry;
-  if (gameId) {
-    const game = state.session.games.find(game => game.id === gameId);
-    if (!game) return;
-    game[field] = event.target.value;
-  } else if (field === 'label') {
-    state.session.gameLabel = event.target.value;
-    element('game-label').value = event.target.value;
-  } else state.session.nextGame[field] = event.target.value;
-  persist();
-  renderModeTracker();
-  renderHistory();
-});
 
 function render() {
   element('session-title').value = state.session.title;
   element('contact').value = state.session.contact;
-  element('game-label').value = state.session.gameLabel;
   element('present-count').textContent = `${state.session.attendees.filter(attendee => attendee.present).length} / ${state.session.attendees.length}`;
   element('game-count').textContent = state.session.games.length;
-  element('session-display').textContent = state.session.title || 'Scrim';
   element('next-number').textContent = String(state.session.games.length + 1);
   renderBoard();
   renderPlans();
@@ -536,10 +507,9 @@ document.addEventListener('change', async event => {
   }
 });
 
-for (const [inputId, field] of [['session-title', 'title'], ['contact', 'contact'], ['game-label', 'gameLabel']]) {
+for (const [inputId, field] of [['session-title', 'title'], ['contact', 'contact']]) {
   element(inputId).addEventListener('input', event => {
     state.session[field] = event.target.value;
-    if (field === 'gameLabel') element('game-rows').querySelector('.upcoming [data-game-field="label"]').value = event.target.value;
     persist();
   });
 }
@@ -550,13 +520,8 @@ document.addEventListener('keydown', event => {
   }
 });
 element('directory-search').addEventListener('input', renderDirectory);
-element('session-title').addEventListener('input', () => { element('session-display').textContent = state.session.title || 'Scrim'; });
 element('settings-button').onclick = () => element('settings-dialog').showModal();
-element('session-settings').onclick = () => element('settings-dialog').showModal();
 element('plans-button').onclick = () => element('plans-dialog').showModal();
-element('history-button').onclick = () => {
-  element('games-section').scrollIntoView({ block: 'start' });
-};
 element('directory-button').onclick = openDirectory;
 element('add-players').onclick = openDirectory;
 element('create-player').onclick = () => openPlayer();
@@ -573,22 +538,52 @@ element('save-plan').onclick = () => {
   notify('Lineup saved to your plans.');
 };
 
-element('log-game').onclick = () => {
-  if (logLocked) return;
+async function gameAction(action, outcome) {
+  if (logLocked || attendancePromptOpen) return;
   try {
-    recordGame(state, uid(), new Date().toISOString());
+    let markPresent = false;
+    if (action === 'start' && !state.session.activeGame && lineupStatus(state).filled === 5 && lineupStatus(state).absent.length) {
+      const lineup = JSON.stringify(state.session.lineup);
+      const names = lineupStatus(state).absent.map(playerId => playerById(playerId).name);
+      attendancePromptOpen = true;
+      try {
+        markPresent = await confirmAction('Are these players here?', `${names.join('\n')}\n\nNot marked present yet.`, 'Mark them here & start');
+      } finally { attendancePromptOpen = false; }
+      if (!markPresent) return;
+      if (lineup !== JSON.stringify(state.session.lineup)) { notify('The lineup changed. Please start again.'); return; }
+    }
+    if (action === 'start') startGame(state, uid(), new Date().toISOString(), markPresent);
+    else if (action === 'finish') {
+      if (!['win', 'loss', 'draw'].includes(outcome)) return;
+      finishGame(state, new Date().toISOString());
+      state.session.games.at(-1).outcome = outcome;
+    }
+    else if (action === 'cancel') cancelActiveGame(state);
+    else if (action === 'reopen') reopenLastGame(state);
+    else return;
     logLocked = true;
     commit();
-    element('log-game').disabled = true;
-    setTimeout(() => { logLocked = false; renderBoard(); }, 1200);
-    notify('Game logged · +1 for your five');
+    if (action !== 'finish') gamesUI.showCurrent();
+    document.querySelectorAll('[data-game-action]').forEach(button => { button.disabled = true; });
+    setTimeout(() => { logLocked = false; renderBoard(); renderGames(); }, 1000);
+    notify(action === 'start' ? 'Game started · five players captured' : action === 'finish' ? 'Game completed · +1 for the recorded five' : action === 'reopen' ? 'Game reopened · playtime credit removed until finished' : 'Returned to upcoming');
   } catch (error) { notify(error.message); }
-};
+}
 element('undo-game').onclick = () => {
   if (!state.session.games.length) return;
+  const previousLabel = state.session.gameLabel;
+  const previousSettings = { ...state.session.nextGame };
   const game = state.session.games.pop();
+  state.session.gameLabel = game.label;
+  state.session.nextGame = { mode: game.mode, ourBan: game.ourBan, theirBan: game.theirBan };
   commit();
-  notify('Game undone.', () => { state.session.games.push(game); commit(); });
+  gamesUI.showCurrent();
+  notify('Game undone · upcoming map and bans restored.', () => {
+    state.session.games.push(game);
+    state.session.gameLabel = previousLabel;
+    state.session.nextGame = previousSettings;
+    commit();
+  });
 };
 element('new-session').onclick = async () => {
   if (await confirmAction('Start a fresh scrim?', 'Your player directory stays. Attendance, lineups, and game history will be cleared. Export first if you want to keep this scrim.', 'Start new scrim')) {
@@ -676,4 +671,55 @@ window.addEventListener('storage', event => {
   rawBackup = null;
 });
 
+const gamesUI = createGamesUI({ getState: () => state, save: commit, action: gameAction, roleIcon });
+const divider = element('panel-divider');
+const splitKey = 'scrimside.panelSplit';
+let panelSplit = 62;
+let resizePointer = null;
+function setPanelSplit(value, save = false) {
+  panelSplit = Math.min(75, Math.max(25, value));
+  document.documentElement.style.setProperty('--roster-share', `${panelSplit}fr`);
+  document.documentElement.style.setProperty('--games-share', `${100 - panelSplit}fr`);
+  divider.setAttribute('aria-valuenow', String(Math.round(panelSplit)));
+  divider.setAttribute('aria-valuetext', `${Math.round(panelSplit)}% roster, ${Math.round(100 - panelSplit)}% games`);
+  if (save) { try { localStorage.setItem(splitKey, String(panelSplit)); } catch {} }
+}
+try {
+  const saved = localStorage.getItem(splitKey);
+  if (saved !== null && Number.isFinite(Number(saved))) panelSplit = Number(saved);
+} catch {}
+setPanelSplit(panelSplit);
+divider.addEventListener('pointerdown', event => {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  resizePointer = event.pointerId;
+  divider.setPointerCapture(event.pointerId);
+  divider.focus({ preventScroll: true });
+  document.body.classList.add('resizing-panels');
+});
+divider.addEventListener('pointermove', event => {
+  if (resizePointer !== event.pointerId) return;
+  const main = document.querySelector('main');
+  const bounds = main.getBoundingClientRect();
+  const styles = getComputedStyle(main);
+  const left = parseFloat(styles.paddingLeft);
+  const width = bounds.width - left - parseFloat(styles.paddingRight) - divider.offsetWidth;
+  if (width > 0) setPanelSplit((event.clientX - bounds.left - left - divider.offsetWidth / 2) / width * 100);
+});
+function finishPanelResize() {
+  if (resizePointer === null) return;
+  resizePointer = null;
+  document.body.classList.remove('resizing-panels');
+  setPanelSplit(panelSplit, true);
+}
+divider.addEventListener('pointerup', finishPanelResize);
+divider.addEventListener('pointercancel', finishPanelResize);
+divider.addEventListener('lostpointercapture', finishPanelResize);
+divider.addEventListener('dblclick', () => setPanelSplit(62, true));
+divider.addEventListener('keydown', event => {
+  const values = { ArrowLeft: panelSplit - (event.shiftKey ? 5 : 1), ArrowRight: panelSplit + (event.shiftKey ? 5 : 1), Home: 25, End: 75, Enter: 62 };
+  if (!(event.key in values)) return;
+  event.preventDefault();
+  setPanelSplit(values[event.key], true);
+});
 render();
