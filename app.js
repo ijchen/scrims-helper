@@ -1,4 +1,4 @@
-import { ROLES, STORAGE_KEY, emptyLineup, newSession, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, startGame, finishGame, reopenLastGame, cancelActiveGame, validateBackup } from './model.js';
+import { ROLES, STORAGE_KEY, emptyLineup, newSession, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, lineupSwaps, autofillLineup, startGame, finishGame, reopenLastGame, cancelActiveGame, validateBackup } from './model.js';
 import { createGamesUI } from './games-ui.js';
 
 const element = id => document.getElementById(id);
@@ -12,6 +12,7 @@ let logLocked = false;
 let attendancePromptOpen = false;
 let draggedPlayerId = '';
 let choosingPlayerId = '';
+let choosingRole = '';
 let hoveredRole = '';
 let focusedRole = '';
 let toastTimer;
@@ -49,16 +50,40 @@ element('copy-scrim-code').onclick = async () => {
   }
 };
 let coinResetTimer;
+let coinRevealTimer;
+let coinAnimation;
 element('coin-flip').onclick = () => {
   clearTimeout(coinResetTimer);
+  clearTimeout(coinRevealTimer);
+  coinAnimation?.cancel();
+  const button = element('coin-flip');
+  const disc = element('coin-disc');
   const result = crypto.getRandomValues(new Uint32Array(1))[0] % 2 ? 'Heads' : 'Tails';
   flipCount += 1;
-  element('coin-result').textContent = result;
-  element('coin-flip').setAttribute('aria-label', `Flip again. Flip ${flipCount}: ${result}`);
-  coinResetTimer = setTimeout(() => {
-    element('coin-result').textContent = 'Flip coin';
-    element('coin-flip').removeAttribute('aria-label');
-  }, 2000);
+  const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 560;
+  const rotation = result === 'Heads' ? 1080 : 1260;
+  button.classList.remove('coin-landed');
+  button.classList.add('coin-flipping');
+  element('coin-result').textContent = 'Flipping';
+  button.setAttribute('aria-label', 'Flipping coin');
+  disc.style.transform = `rotateY(${rotation}deg)`;
+  if (duration) coinAnimation = disc.animate([
+    { transform: 'translateY(0) rotateY(0deg) scale(1)' },
+    { transform: `translateY(-6px) rotateY(${rotation * .45}deg) scale(1.12)`, offset: .45 },
+    { transform: `translateY(0) rotateY(${rotation}deg) scale(1)` },
+  ], { duration, easing: 'cubic-bezier(.2,.65,.3,1)' });
+  coinRevealTimer = setTimeout(() => {
+    button.classList.remove('coin-flipping');
+    button.classList.add('coin-landed');
+    element('coin-result').textContent = result;
+    button.setAttribute('aria-label', `Flip again. Flip ${flipCount}: ${result}`);
+    coinResetTimer = setTimeout(() => {
+      button.classList.remove('coin-landed');
+      disc.style.transform = '';
+      element('coin-result').textContent = 'Flip coin';
+      button.removeAttribute('aria-label');
+    }, 2000);
+  }, duration);
 };
 
 try {
@@ -101,6 +126,7 @@ function persist() {
 
 function commit() {
   choosingPlayerId = '';
+  choosingRole = '';
   clearTimeout(toastTimer);
   element('toast').hidden = true;
   persist();
@@ -183,19 +209,20 @@ function playerCard(attendee) {
     </div>
     <label class="assignment-control"><span>Playing as</span><select data-assignment="${escapeHtml(player.id)}" aria-label="Playing as for ${escapeHtml(player.name)}"><option value="" ${!assignedRole ? 'selected' : ''}>Bench</option>${usual.length ? `<optgroup label="Usual roles">${usual.map(option).join('')}</optgroup>` : ''}${fills.length ? `<optgroup label="Fill (off-role)">${fills.map(option).join('')}</optgroup>` : ''}</select></label>
     <div class="playtime">${gameBar(gamesFor(state, player.id), 'total', 'total-games', capacity, Boolean(activeSlot))}${barGroups.map(barGroup => gameBar(gamesFor(state, player.id, barGroup), groupLabels[barGroup], `role-games ${barGroup}`, capacity, activeGroup === barGroup)).join('')}</div>
-    <div class="row-actions">${copyPlayerButton(player)}<button class="edit-player" data-edit="${escapeHtml(player.id)}" title="Edit ${escapeHtml(player.name)}" aria-label="Edit ${escapeHtml(player.name)}">⋯</button></div>
+    <div class="row-actions">${copyPlayerButton(player)}<button class="remove-player" data-remove="${escapeHtml(player.id)}" aria-label="Remove ${escapeHtml(player.name)} from scrim" title="${attendee.present ? 'Mark not present before removing from scrim' : 'Remove from scrim'}" ${attendee.present ? 'disabled' : ''}><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg></button><button class="edit-player" data-edit="${escapeHtml(player.id)}" title="Edit ${escapeHtml(player.name)}" aria-label="Edit ${escapeHtml(player.name)}">⋯</button></div>
   </article>`;
 }
 
 function renderBoard() {
   const focused = document.activeElement;
-  const focusKey = ['present', 'assignment', 'quickAssign', 'copyPlayer'].find(key => focused?.dataset[key]);
+  const focusKey = ['present', 'assignment', 'quickAssign', 'copyPlayer', 'emptyRole'].find(key => focused?.dataset[key]);
   const focusValue = focused?.dataset[focusKey];
   const attendees = sortedAttendees();
   if (!attendees.some(attendee => attendee.playerId === choosingPlayerId)) choosingPlayerId = '';
+  if (state.session.lineup[choosingRole]) choosingRole = '';
   const choices = choosingPlayerId ? assignmentChoices(state, choosingPlayerId) : [];
   element('board').classList.toggle('choosing-role', Boolean(choosingPlayerId));
-  element('role-choice-text').textContent = choosingPlayerId ? `Choose a highlighted role for ${playerById(choosingPlayerId).name}. Press Escape or click the player again to cancel.` : '';
+  element('role-choice-text').textContent = choosingPlayerId ? `Choose a highlighted role for ${playerById(choosingPlayerId).name}. Press Escape or click the player again to cancel.` : choosingRole ? `Choose a player for ${choosingRole}. Highlighted players play this role; other players can still fill. Press Escape to cancel.` : '';
   element('board').hidden = attendees.length === 0;
   element('empty-roster').hidden = attendees.length !== 0;
   element('lineup-strip').innerHTML = ['tank', 'dps', 'support'].map(group => `<div class="lineup-group ${group}">
@@ -207,12 +234,16 @@ function renderBoard() {
       <span class="slot-role">${roleIcon(roleGroup(role))}${role}</span><span class="slot-name">${escapeHtml(player?.name || 'Empty')}</span>${offRole ? '<span class="off-role-badge">Off-role</span>' : ''}
     </button>`;
   }).join('')}</div>`).join('');
-  element('player-roster').innerHTML = attendees.map(playerCard).join('');
+  element('player-roster').innerHTML = attendees.map(playerCard).join('') + '<button class="add-player-row" data-open-directory><span aria-hidden="true">＋</span> Add player</button>';
   const status = lineupStatus(state);
   element('lineup-status').textContent = `${state.session.activeGame ? 'Next lineup · ' : ''}${status.filled < 5 ? `${status.filled}/5 selected` : status.absent.length ? `${status.absent.length} not marked here` : '✓ Ready'}`;
   element('lineup-status').classList.toggle('ready', status.ready);
-  element('save-plan').disabled = status.filled !== 5;
   element('clear-lineup').disabled = status.filled === 0;
+  element('autofill-lineup').disabled = status.filled === 5;
+  element('autofill-lineup').title = status.filled === 5 ? 'Lineup is full' : 'Fill empty slots with present players';
+  const hasPreviousGame = Boolean(state.session.activeGame || state.session.games.length);
+  element('lineup-swaps').disabled = !hasPreviousGame || status.filled !== 5;
+  element('lineup-swaps').title = !hasPreviousGame ? 'Start a game first to compare lineups' : status.filled !== 5 ? 'Fill all five lineup slots to see swaps' : 'Compare with the active or most recent game';
   if (focusKey) {
     Array.from(element('board').querySelectorAll('input, select, button')).find(item => item.dataset[focusKey] === focusValue)?.focus({ preventScroll: true });
   }
@@ -227,7 +258,11 @@ function previewTarget(target) {
 }
 
 function applyRolePreview() {
-  const role = choosingPlayerId ? '' : hoveredRole || focusedRole;
+  const role = choosingPlayerId ? '' : choosingRole || hoveredRole || focusedRole;
+  for (const slot of element('lineup-strip').querySelectorAll('[data-empty-role]')) {
+    slot.classList.toggle('choosing-player', slot.dataset.emptyRole === choosingRole);
+    slot.setAttribute('aria-pressed', String(slot.dataset.emptyRole === choosingRole));
+  }
   for (const row of element('player-roster').querySelectorAll('[data-player-card]')) {
     const matches = role && playerById(row.dataset.playerCard).roles.some(playerRole => playerRole === role || roleGroup(playerRole) === role);
     row.classList.toggle('eligible-preview', Boolean(matches));
@@ -236,6 +271,10 @@ function applyRolePreview() {
 }
 
 function quickAssignPlayer(playerId) {
+  if (choosingRole) {
+    placePlayer(playerId, choosingRole);
+    return;
+  }
   const choices = assignmentChoices(state, playerId);
   if (choices.length <= 1) {
     choosingPlayerId = '';
@@ -263,23 +302,14 @@ function placePlayer(playerId, role, swap = false) {
   notify(message, () => { state.session.lineup = previous; commit(); });
 }
 
-function renderPlans() {
-  element('plan-count').textContent = state.session.plans.length;
-  element('plans').innerHTML = state.session.plans.length ? state.session.plans.map((plan, index) => `<article class="plan-card"><div class="plan-title"><strong>${escapeHtml(plan.label || `Lineup ${index + 1}`)}</strong><button class="quiet" data-delete-plan="${escapeHtml(plan.id)}" aria-label="Delete planned lineup ${index + 1}">×</button></div><div class="mini-lineup">${ROLES.map(role => `<span><b class="${roleGroup(role)}">${role}</b>${escapeHtml(playerById(plan.lineup[role])?.name || 'Open slot')}</span>`).join('')}</div><button class="secondary use-plan" data-use-plan="${escapeHtml(plan.id)}">Use this lineup <span>↗</span></button></article>`).join('') : '<div class="empty-small">No saved lineups.</div>';
-}
-
-function renderHistory() {
-  element('undo-game').hidden = state.session.games.length === 0;
-  element('history').innerHTML = state.session.games.length ? [...state.session.games].reverse().map((game, index) => `<details class="history-item"><summary><span class="history-number">${String(state.session.games.length - index).padStart(2, '0')}</span><span><strong>${escapeHtml(game.label || 'Game played')}</strong><small>${new Date(game.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · 5 players</small></span><span class="history-check">✓</span></summary><div class="mini-lineup">${game.lineup.map(slot => `<span><b class="${roleGroup(slot.role)}">${slot.role}</b>${escapeHtml(slot.name)}</span>`).join('')}</div></details>`).join('') : '<div class="empty-small">No games yet.</div>';
-}
-
 function renderDirectory() {
   const query = element('directory-search').value.toLowerCase();
   const players = [...state.players].sort((first, second) => first.name.localeCompare(second.name)).filter(player => `${player.name} ${player.battletag} ${player.roles.join(' ')}`.toLowerCase().includes(query));
-  element('directory-list').innerHTML = players.length ? players.map(player => `<div class="directory-row"><label class="directory-person"><input type="checkbox" data-attendee="${escapeHtml(player.id)}" ${state.session.attendees.some(attendee => attendee.playerId === player.id) ? 'checked' : ''}><span><strong>${escapeHtml(player.name)} ${statusBadge(player)}</strong><small>${escapeHtml(player.battletag || 'No BattleTag')} · ${player.roles.join(' / ')}</small></span></label><button class="quiet" data-edit="${escapeHtml(player.id)}" aria-label="Edit ${escapeHtml(player.name)}">Edit</button></div>`).join('') : `<div class="empty-small"><p>${state.players.length ? 'No matching players.' : 'Your regulars, all in one place.'}</p><span>${state.players.length ? 'Try another name or role.' : 'Create a player to add them to your directory and this scrim.'}</span></div>`;
+  element('directory-list').innerHTML = players.length ? players.map(player => `<div class="directory-row"><label class="directory-person"><input type="checkbox" data-attendee="${escapeHtml(player.id)}" ${state.session.attendees.some(attendee => attendee.playerId === player.id) ? 'checked' : ''}><span><strong>${escapeHtml(player.name)} ${statusBadge(player)}</strong><small>${escapeHtml(player.battletag || 'No BattleTag')} · ${player.roles.join(' / ')}</small></span></label><button class="quiet" data-edit="${escapeHtml(player.id)}" aria-label="Edit ${escapeHtml(player.name)}">Edit</button></div>`).join('') : `<div class="empty-small"><p>${state.players.length ? 'No matching players.' : 'No players yet.'}</p><span>${state.players.length ? 'Try a different search.' : 'Add a player to get started.'}</span></div>`;
 }
 
 function renderGames() {
+  element('undo-game').hidden = state.session.games.length === 0;
   gamesUI.render();
 }
 
@@ -290,9 +320,7 @@ function render() {
   element('game-count').textContent = state.session.games.length;
   element('next-number').textContent = String(state.session.games.length + 1);
   renderBoard();
-  renderPlans();
   renderGames();
-  renderHistory();
   renderDirectory();
 }
 
@@ -426,6 +454,12 @@ element('board').addEventListener('contextmenu', event => {
 document.addEventListener('click', async event => {
   const row = event.target.closest('[data-player-card]');
   const choice = event.target.closest('[data-choice-player]');
+  const emptySlot = event.target.closest('[data-empty-role]');
+  if (choosingRole && !row && !emptySlot) {
+    choosingRole = '';
+    element('role-choice-text').textContent = '';
+    applyRolePreview();
+  }
   if (choosingPlayerId && row?.dataset.playerCard !== choosingPlayerId && choice?.dataset.choicePlayer !== choosingPlayerId) {
     choosingPlayerId = '';
     element('board').classList.remove('choosing-role');
@@ -455,6 +489,13 @@ document.addEventListener('click', async event => {
   if (button.dataset.quickAssign) quickAssignPlayer(button.dataset.quickAssign);
   if (button.dataset.choiceRole && button.dataset.choicePlayer === choosingPlayerId && assignmentChoices(state, choosingPlayerId).includes(button.dataset.choiceRole)) {
     placePlayer(choosingPlayerId, button.dataset.choiceRole);
+    return;
+  }
+  if (button.dataset.emptyRole) {
+    choosingPlayerId = '';
+    choosingRole = choosingRole === button.dataset.emptyRole ? '' : button.dataset.emptyRole;
+    renderBoard();
+    return;
   }
   if (button.dataset.copyPlayer) {
     const player = playerById(button.dataset.copyPlayer);
@@ -471,22 +512,12 @@ document.addEventListener('click', async event => {
   }
   if (button.dataset.remove) {
     const player = playerById(button.dataset.remove);
-    if (await confirmAction('Remove from this scrim?', `${player.name} will be removed from attendance and planned lineups. Their directory entry and played games stay saved.`, 'Remove')) {
-      removeAttendee(state, player.id);
-      commit();
-    }
-  }
-  if (button.dataset.usePlan) {
-    const plan = state.session.plans.find(item => item.id === button.dataset.usePlan);
-    state.session.lineup = { ...plan.lineup };
-    state.session.gameLabel = plan.label;
+    const attendee = state.session.attendees.find(item => item.playerId === player?.id);
+    if (!attendee || attendee.present) return;
+    const previous = structuredClone({ attendees: state.session.attendees, lineup: state.session.lineup, plans: state.session.plans });
+    removeAttendee(state, player.id);
     commit();
-    element('plans-dialog').close();
-    notify('Lineup loaded.');
-  }
-  if (button.dataset.deletePlan) {
-    state.session.plans = state.session.plans.filter(plan => plan.id !== button.dataset.deletePlan);
-    commit();
+    notify(`${player.name} removed from scrim.`, () => { Object.assign(state.session, previous); commit(); });
   }
 });
 
@@ -514,28 +545,51 @@ for (const [inputId, field] of [['session-title', 'title'], ['contact', 'contact
   });
 }
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !document.querySelector('dialog[open]') && choosingPlayerId) {
+  if (event.key === 'Escape' && !document.querySelector('dialog[open]') && (choosingPlayerId || choosingRole)) {
     choosingPlayerId = '';
+    choosingRole = '';
     renderBoard();
   }
 });
 element('directory-search').addEventListener('input', renderDirectory);
 element('settings-button').onclick = () => element('settings-dialog').showModal();
-element('plans-button').onclick = () => element('plans-dialog').showModal();
-element('directory-button').onclick = openDirectory;
 element('add-players').onclick = openDirectory;
 element('create-player').onclick = () => openPlayer();
+element('lineup-swaps').onclick = () => {
+  try {
+    const { source, pairs, message } = lineupSwaps(state);
+    const number = state.session.activeGame ? state.session.games.length + 1 : state.session.games.length;
+    const swapArrow = '<svg class="swap-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>';
+    element('swaps-source').innerHTML = `<span>Game ${number}${state.session.activeGame ? ' · In progress' : ' · Completed'}${source.label ? ` · ${escapeHtml(source.label)}` : ''}</span><span class="swaps-destination">${swapArrow} Current lineup</span>`;
+    const playerLabel = player => `<strong>${escapeHtml(player.battletag?.split('#')[0].trim() || player.name)}</strong><small class="${roleGroup(player.role)}">${escapeHtml(player.role)}</small>`;
+    element('swaps-list').innerHTML = pairs.length ? '<div class="swap-labels"><span>In</span><span></span><span>Out</span></div>' + pairs.map(pair => `<div class="swap-pair"><span>${playerLabel(pair.incoming)}</span>${swapArrow}<span>${playerLabel(pair.outgoing)}</span></div>`).join('') : '<p class="swaps-empty">No player swaps needed.</p>';
+    element('swaps-message').value = message;
+    element('swaps-message-field').hidden = !pairs.length;
+    element('copy-swaps').hidden = !pairs.length;
+    element('swaps-dialog').showModal();
+  } catch (error) { notify(error.message); }
+};
+element('copy-swaps').onclick = async () => {
+  try { await navigator.clipboard.writeText(element('swaps-message').value); notify('Swap message copied.'); }
+  catch {
+    element('swaps-message').focus();
+    element('swaps-message').select();
+    notify('Use Ctrl+C or ⌘C to copy the selected message.');
+  }
+};
 element('clear-lineup').onclick = () => {
   const previous = { ...state.session.lineup };
   state.session.lineup = emptyLineup();
   commit();
   notify('Lineup cleared.', () => { state.session.lineup = previous; commit(); });
 };
-element('save-plan').onclick = () => {
-  if (lineupStatus(state).filled !== 5) return;
-  state.session.plans.push({ id: uid(), label: state.session.gameLabel.trim(), lineup: { ...state.session.lineup } });
-  commit();
-  notify('Lineup saved to your plans.');
+element('autofill-lineup').onclick = () => {
+  try {
+    const previous = { ...state.session.lineup };
+    state.session.lineup = autofillLineup(state);
+    commit();
+    notify('Lineup filled.', () => { state.session.lineup = previous; commit(); });
+  } catch (error) { notify(error.message); }
 };
 
 async function gameAction(action, outcome) {

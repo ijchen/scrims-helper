@@ -186,7 +186,7 @@
   .lineup-group { gap: 6px 8px; }
   .roster-head { padding-bottom: 6px; }
   .player-roster { min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; padding: 2px 5px 3px 1px; scrollbar-gutter: stable; }
-  .roster-row, .roster-head { grid-template-columns: 66px minmax(100px, 1fr) 120px minmax(110px, .8fr) 58px; gap: 9px; padding-left: 9px; padding-right: 9px; }
+  .roster-row, .roster-head { grid-template-columns: 66px minmax(100px, 1fr) 120px minmax(110px, .8fr) 96px; gap: 9px; padding-left: 9px; padding-right: 9px; }
   .roster-row .card-name { font-size: 14px; }
   .roster-row { padding-top: 4px; padding-bottom: 4px; }
   .roster-row .role-games { font-size: 11px; line-height: 1; }
@@ -224,7 +224,7 @@
   #storage-warning { grid-area: warning; margin: 0; }
 }
 
-@container (max-width: 580px) {
+@container (max-width: 620px) {
   .roster-row { grid-template-columns: 32px minmax(0, 1fr) 90px 36px; gap: 6px; padding: 6px; }
   .roster-head { visibility: hidden; height: 0; padding: 0; overflow: hidden; }
   .roster-row .playtime { grid-column: 2 / 5; grid-row: 2; }

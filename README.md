@@ -41,6 +41,19 @@ Dark mode uses neutral **Charcoal**. Switch themes using the sun/moon button bes
 
 The roster always shows everyone, with one row per player. Use the role-heading hover previews to find eligible players without hiding anyone.
 
+**Autofill** fills only empty slots and keeps all existing selections, including off-role or absent players you selected manually. New selections must be present, distinct, and opted into the assigned role. It either produces a complete lineup or changes nothing and explains which roles lack enough eligible players. Undo restores the previous lineup.
+
+Autofill ranks complete options by these criteria, in order:
+1. Largest playtime fairness gain: each added player contributes `1 / (games played + 1)`.
+2. Largest reduction in total squared imbalance across each player's opted-in Tank / DPS / Support groups.
+3. Largest reduction in squared imbalance between opted-in subroles within DPS or Support.
+4. Most trials added (ahead of both default and team members).
+5. Uniform random choice among equally ranked complete assignments. Undo and retry may give another equally good lineup, but can also repeat it.
+
+Completed and in-progress snapshots both count toward these calculations. Role balance measures improvement, not existing imbalance; fixed selections contribute the same amounts to every candidate and need not be scored. Harmonic gains are compared with exact integer arithmetic, and role-balance gains are scaled to integers, so numerical rounding does not break ties. A dynamic program over at most 32 slot subsets finds globally optimal assignments without enumerating every lineup; it tracks the number of tied assignments to sample fairly.
+
+**Swaps**, beside **Clear lineup**, compares your selected five with the in-progress game, or the most recent completed game if none is active. Players staying in are omitted even if they change roles. Incoming and outgoing players are paired to minimize cross-role-group substitutions, then prefer exact roles. The popup shows each pair and a copyable message using BattleTags without the numeric suffix (falling back to display names). Fill all five slots first; this only prepares a message and does not change attendance or either lineup.
+
 Drag a player onto an occupied slot or another player's row to swap their positions. Bench-to-lineup swaps work in either direction; two benched players stay benched. Off-role swaps are allowed and turn pink. Drop on an empty slot to move there, or outside the lineup and player rows to bench someone. **Undo** restores both sides of a swap.
 
 Hover the Tank, DPS, or Support heading above the lineup to highlight players with any role in that group, even when the slots are filled. Hover an empty lineup slot to highlight players who play that exact role instead. Other players dim; moving away restores the roster. This is a preview only: it does not change assignments or counts. Keyboard focus offers the same previews.
@@ -53,7 +66,7 @@ To bench someone, right-click their player row or occupied lineup slot, or drag 
 
 Popups close when you click outside or press Escape. Player details save as you edit, including partially entered new players. Players without roles remain available under **Choose roles**. Clicking outside a confirmation cancels that action.
 
-**Plans & history** contains saved lineups and the game log. Add an optional map/name and choose **Save lineup**; **Use this lineup** restores it and returns to the board. The gear or scrim name opens settings for the opponent BattleTag, new scrim, and import/export. The compact board is always the default view.
+Games and their recorded lineups are visible directly in the Games panel. Edit the scrim name and opponent BattleTag in the summary bar. The gear opens settings for a new scrim and import/export. The old Plans & history dialog is removed; existing saved plans remain preserved in backups for compatibility.
 
 Editing a player's opted-in roles keeps their current and planned assignments; any nonmatching current assignment appears as an off-role fill. Removing a player does not erase played-game history. Starting a new scrim retains the directory and clears this scrim's attendance, plans, and history; export first to retain a record.
 

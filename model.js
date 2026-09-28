@@ -29,6 +29,31 @@ export const STORAGE_KEY = 'scrimside.v1';
 export const MODES = ['Control', 'Push', 'Hybrid', 'Escort', 'Flashpoint'];
 export const OUTCOMES = ['win', 'loss', 'draw'];
 
+export function lineupSwaps(state) {
+  const source = state.session.activeGame || state.session.games.at(-1);
+  if (!source) throw new Error('Start a game first to compare lineups.');
+  const next = ROLES.map(role => {
+    const player = state.players.find(player => player.id === state.session.lineup[role]);
+    return player ? { role, playerId: player.id, name: player.name, battletag: player.battletag } : null;
+  });
+  if (next.some(slot => !slot) || new Set(next.map(slot => slot.playerId)).size !== 5) throw new Error('Fill all five lineup slots to see swaps.');
+  const incoming = next.filter(slot => !source.lineup.some(previous => previous.playerId === slot.playerId));
+  const outgoing = ROLES.map(role => source.lineup.find(slot => slot.role === role)).filter(slot => slot && !next.some(player => player.playerId === slot.playerId));
+  let best = { score: Infinity, pairs: [] };
+  function match(remaining, pairs, score) {
+    if (score >= best.score) return;
+    if (pairs.length === incoming.length) { best = { score, pairs }; return; }
+    const player = incoming[pairs.length];
+    remaining.forEach((previous, index) => {
+      const cost = player.role === previous.role ? 0 : roleGroup(player.role) === roleGroup(previous.role) ? 1 : 10;
+      match(remaining.filter((_, otherIndex) => otherIndex !== index), [...pairs, { incoming: player, outgoing: previous }], score + cost);
+    });
+  }
+  match(outgoing, [], 0);
+  const name = player => player.battletag?.split('#')[0].trim() || player.name;
+  return { source, pairs: best.pairs, message: best.pairs.map(pair => `${name(pair.incoming)} in for ${name(pair.outgoing)}`).join(', ') };
+}
+
 export function setGameOutcome(state, gameId, outcome) {
   if (outcome !== '' && !OUTCOMES.includes(outcome)) throw new Error('Unknown game result.');
   const game = state.session.activeGame?.id === gameId ? state.session.activeGame : state.session.games.find(game => game.id === gameId);
@@ -73,6 +98,96 @@ export function roleGroup(role) {
 
 export function gamesFor(state, playerId, group = null) {
   return state.session.games.filter(game => game.lineup.some(slot => slot.playerId === playerId && (group === null || roleGroup(slot.role) === group))).length;
+}
+
+function randomBelow(limit) {
+  if (limit === 1n) return 0n;
+  const bits = limit.toString(2).length;
+  const words = new Uint32Array(Math.ceil(bits / 32));
+  const mask = (1n << BigInt(bits)) - 1n;
+  let value;
+  do {
+    crypto.getRandomValues(words);
+    value = words.reduce((total, word) => (total << 32n) | BigInt(word), 0n) & mask;
+  } while (value >= limit);
+  return value;
+}
+
+export function autofillLineup(state, chooseRandom = randomBelow) {
+  const lineup = { ...state.session.lineup };
+  const fixed = ROLES.map(role => lineup[role]).filter(Boolean);
+  if (new Set(fixed).size !== fixed.length || fixed.some(id => !state.players.some(player => player.id === id))) throw new Error('Check the selected players before autofilling.');
+  const emptyRoles = ROLES.filter(role => !lineup[role]);
+  if (!emptyRoles.length) return lineup;
+  const present = new Set(state.session.attendees.filter(attendee => attendee.present).map(attendee => attendee.playerId));
+  const candidates = state.players.filter(player => present.has(player.id) && !fixed.includes(player.id) && emptyRoles.some(role => player.roles.includes(role)));
+  const fullMask = (1 << emptyRoles.length) - 1;
+  const subsets = Array.from({ length: fullMask }, (_, index) => index + 1).map(mask => ({ mask, roles: emptyRoles.filter((_, index) => mask & (1 << index)) })).sort((first, second) => first.roles.length - second.roles.length);
+  for (const { roles } of subsets) {
+    const available = candidates.filter(player => roles.some(role => player.roles.includes(role))).length;
+    if (available < roles.length) {
+      if (roles.length === 1) throw new Error(`No available present player for ${roles[0]}.`);
+      throw new Error(`${roles.join(' / ')} need ${roles.length} different players; only ${available} eligible ${available === 1 ? 'player is' : 'players are'} available.`);
+    }
+  }
+  const history = [...state.session.games, ...(state.session.activeGame ? [state.session.activeGame] : [])];
+  const counts = new Map(candidates.map(player => [player.id, { total: 0, roles: Object.fromEntries(ROLES.map(role => [role, 0])) }]));
+  for (const game of history) {
+    for (const slot of game.lineup) {
+      const count = counts.get(slot.playerId);
+      if (count) { count.total += 1; count.roles[slot.role] += 1; }
+    }
+  }
+  const gcd = (first, second) => {
+    while (second) [first, second] = [second, first % second];
+    return first;
+  };
+  const denominator = candidates.reduce((multiple, player) => {
+    const divisor = BigInt(counts.get(player.id).total + 1);
+    return multiple / gcd(multiple, divisor) * divisor;
+  }, 1n);
+  const balanceGain = (values, index) => (12 * values.reduce((sum, count) => sum + count, 0) + 6) / values.length - 12 * values[index] - 6;
+  const scores = new Map(candidates.map(player => {
+    const count = counts.get(player.id);
+    const groups = [...new Set(player.roles.map(roleGroup))];
+    const groupCounts = groups.map(group => ROLES.filter(role => roleGroup(role) === group).reduce((sum, role) => sum + count.roles[role], 0));
+    return [player.id, emptyRoles.map(role => {
+      if (!player.roles.includes(role)) return null;
+      const group = roleGroup(role);
+      const subroles = ROLES.filter(subrole => roleGroup(subrole) === group && player.roles.includes(subrole));
+      return [denominator / BigInt(count.total + 1), balanceGain(groupCounts, groups.indexOf(group)), balanceGain(subroles.map(subrole => count.roles[subrole]), subroles.indexOf(role)), Number(player.status === 'trial')];
+    })];
+  }));
+  const compare = (first, second) => {
+    for (let index = 0; index < first.length; index += 1) {
+      if (first[index] !== second[index]) return first[index] > second[index] ? 1 : -1;
+    }
+    return 0;
+  };
+  let options = new Map([[0, { score: [0n, 0, 0, 0], ways: 1n, lineup }]]);
+  for (const player of candidates) {
+    const next = new Map(options);
+    for (const [mask, option] of options) {
+      emptyRoles.forEach((role, index) => {
+        const gain = scores.get(player.id)[index];
+        if (!gain || mask & (1 << index)) return;
+        const nextMask = mask | (1 << index);
+        const score = option.score.map((value, criterion) => value + gain[criterion]);
+        const existing = next.get(nextMask);
+        const comparison = existing ? compare(score, existing.score) : 1;
+        if (comparison < 0) return;
+        const proposal = { score, ways: option.ways, lineup: { ...option.lineup, [role]: player.id } };
+        if (comparison > 0) next.set(nextMask, proposal);
+        else {
+          const ways = existing.ways + proposal.ways;
+          const selected = chooseRandom(ways) < proposal.ways ? proposal : existing;
+          next.set(nextMask, { ...selected, ways });
+        }
+      });
+    }
+    options = next;
+  }
+  return options.get(fullMask).lineup;
 }
 
 export function assignmentChoices(state, playerId) {

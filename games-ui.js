@@ -55,6 +55,8 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
     const previousScroll = element('game-rows').scrollTop;
     const historyScroll = { top: previousSelector?.scrollTop || 0, left: previousSelector?.scrollLeft || 0 };
     const justCompleted = previousCompletedCount !== null && session.games.length > previousCompletedCount;
+    const previousLiveCard = element('game-rows').querySelector('.game-card.live');
+    const completedAnchor = justCompleted && previousLiveCard?.dataset.gameEntry === session.games.at(-1)?.id ? previousLiveCard.getBoundingClientRect().top : null;
     if (justCompleted) {
       historyScroll.top = 0;
       historyScroll.left = Number.MAX_SAFE_INTEGER;
@@ -83,7 +85,15 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
     element('game-rows').scrollTop = previousScroll;
     const selector = element('game-overview');
     if (selector) { selector.scrollTop = historyScroll.top; selector.scrollLeft = historyScroll.left; }
-    if (justCompleted) jumpToGame(session.games.at(-1).id);
+    if (justCompleted) {
+      if (completedAnchor !== null && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const rows = element('game-rows');
+        const completed = [...rows.querySelectorAll('.game-card.completed')].find(card => card.dataset.gameEntry === session.games.at(-1).id);
+        const scroller = getComputedStyle(rows).overflowY === 'auto' ? rows : document.scrollingElement;
+        scroller.scrollTop += completed.getBoundingClientRect().top - completedAnchor;
+      }
+      jumpToGame('', true);
+    }
     applyGameHighlight();
   }
 
@@ -167,12 +177,14 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
     const query = element('catalog-search').value;
     const collection = maps ? MAPS : HEROES;
     const candidates = collection.filter(item => !filter || (maps ? item.mode : item.role) === filter);
-    const matches = searchCatalog(candidates, query);
-    element('catalog-filters').innerHTML = [['', 'All'], ...(maps ? MODES.map(mode => [mode, mode]) : [['tank', 'Tank'], ['dps', 'DPS'], ['support', 'Support']])].map(([value, label]) => `<button class="quiet" data-catalog-filter="${value}" aria-pressed="${filter === value}">${label}</button>`).join('');
-    element('catalog-results').classList.toggle('map-results', maps);
-    element('catalog-results').innerHTML = matches.map(item => {
+    const matches = searchCatalog(candidates, query).map(item => {
       const candidate = { ...getGame(picker.id), [picker.field]: item.name, ...(maps ? { mode: item.mode } : {}) };
       const warnings = gameWarnings(getState().session, candidate, picker.id)[picker.field];
+      return { item, warnings };
+    }).sort((first, second) => Number(Boolean(first.warnings.length)) - Number(Boolean(second.warnings.length)));
+    element('catalog-filters').innerHTML = [['', 'All'], ...(maps ? MODES.map(mode => [mode, mode]) : [['tank', 'Tank'], ['dps', 'DPS'], ['support', 'Support']])].map(([value, label]) => `<button class="quiet" data-catalog-filter="${value}" aria-pressed="${filter === value}">${label}</button>`).join('');
+    element('catalog-results').classList.toggle('map-results', maps);
+    element('catalog-results').innerHTML = matches.map(({ item, warnings }) => {
       return `<button class="catalog-option ${maps ? '' : item.role} ${warnings.length ? 'has-conflict' : ''}" data-catalog-id="${item.id}" aria-label="${escapeHtml(item.name)}${maps ? `, ${item.mode}` : ''}${warnings.length ? ` · ${warnings.join(' · ')}` : ''}"><img src="${item.image}" alt="" loading="lazy"><strong>${escapeHtml(item.name)}</strong><small>${maps ? item.mode : item.role === 'dps' ? 'DPS' : item.role}</small>${warningText(warnings)}</button>`;
     }).join('') || '<p class="muted">No matches.</p>';
     element('catalog-custom').hidden = !query.trim();
@@ -186,7 +198,7 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
     filter = initialFilter;
     element('catalog-heading').textContent = field === 'label' ? 'Choose map' : field === 'ourBan' ? 'Our hero ban' : 'Their hero ban';
     element('catalog-search').value = '';
-    element('catalog-search').placeholder = field === 'label' ? 'Search maps · try “kr” or “gib”' : 'Search heroes · try “brig” or “76”';
+    element('catalog-search').placeholder = field === 'label' ? 'Search maps…' : 'Search heroes…';
     renderPicker();
     pickerDialog.showModal();
     element('catalog-search').focus();

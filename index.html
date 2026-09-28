@@ -13,8 +13,6 @@
   <header class="topbar">
     <a class="brand" href="./" aria-label="Scrimside home"><span class="brand-mark">S↗</span><span>scrimside</span></a>
     <nav aria-label="Scrim tools">
-      <button id="directory-button" class="secondary">+ Players</button>
-      <button id="plans-button" class="quiet">Plans & history</button>
       <button id="theme-toggle" class="icon-button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☾</button>
       <button id="settings-button" class="icon-button" aria-label="Settings and backups" title="Settings and backups">⚙</button>
     </nav>
@@ -23,15 +21,15 @@
   <main>
     <div id="storage-warning" class="warning" hidden></div>
     <section class="scrim-summary" aria-label="Scrim overview">
-      <div class="summary-name"><label for="session-title">Scrim name</label><input id="session-title" maxlength="100" placeholder="Thursday practice" autocomplete="off"></div>
+      <div class="summary-name"><label for="session-title">Scrim name</label><input id="session-title" maxlength="100" placeholder="Scrim name" autocomplete="off"></div>
       <div class="summary-contact"><label for="contact">Contact Battle.net</label><div class="summary-input"><input id="contact" maxlength="100" placeholder="BattleTag#1234" autocomplete="off" spellcheck="false"><button id="copy-contact" class="secondary" aria-label="Copy contact BattleTag" title="Copy contact BattleTag"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg>Copy</button></div></div>
       <div class="summary-stat"><strong id="present-count">0 / 0</strong><span>players here</span></div>
       <div class="summary-stat"><span class="summary-games-line"><strong id="game-count">0</strong><span id="games-record" aria-label="Completed game results"></span></span><span>games played</span></div>
-      <div class="quick-tools"><button id="copy-scrim-code" class="secondary" title="Copy scrim code" aria-label="Copy scrim code DKEEH">DKEEH <span aria-hidden="true">⧉</span></button><button id="coin-flip" class="secondary" title="Flip a coin"><span aria-hidden="true">◉</span> <span id="coin-result" aria-live="polite">Flip coin</span></button></div>
+      <div class="quick-tools"><button id="copy-scrim-code" class="secondary" title="Copy scrim code" aria-label="Copy scrim code DKEEH">DKEEH <span aria-hidden="true">⧉</span></button><button id="coin-flip" class="secondary" title="Flip a coin"><span class="coin-scene" aria-hidden="true"><span id="coin-disc" class="coin-disc"><span class="coin-face coin-heads">H</span><span class="coin-face coin-tails">T</span></span></span><span id="coin-result" aria-live="polite">Flip coin</span></button></div>
     </section>
     <section class="live-toolbar" aria-label="Lineup controls">
       <div class="game-heading"><h1>Game <span id="next-number">1</span></h1><span id="lineup-status" role="status"></span></div>
-      <div class="game-actions"><button id="clear-lineup" class="quiet" title="Bench all five players">Clear lineup</button></div>
+      <div class="game-actions"><button id="clear-lineup" class="quiet" title="Bench all five players">Clear lineup</button><button id="autofill-lineup" class="quiet">Autofill</button><button id="lineup-swaps" class="quiet">Swaps</button></div>
     </section>
     <section id="board" class="board" aria-label="Lineup and roster">
       <div id="lineup-strip" class="lineup-strip" aria-label="Next game's five slots"></div>
@@ -56,34 +54,33 @@
     <div class="dialog-footer"><button id="new-session" class="quiet danger">New scrim</button><button class="primary" data-close="settings-dialog">Done</button></div>
   </dialog>
 
-  <dialog id="plans-dialog" aria-labelledby="plans-heading">
-    <div class="dialog-heading"><h2 id="plans-heading">Plans & history</h2><button class="icon-button" data-close="plans-dialog" aria-label="Close plans and history">×</button></div>
-    <div class="plan-tools"><button id="save-plan" class="secondary">Save lineup</button></div>
-    <div class="section-title"><h3>Saved lineups <span id="plan-count" class="count-tag">0</span></h3></div>
-    <div id="plans"></div>
-    <h3 class="history-heading">Game log</h3><div id="history"></div>
-  </dialog>
-
   <dialog id="directory-dialog">
-    <div class="dialog-heading"><div><p class="eyebrow">BUILD YOUR BENCH</p><h2>Player directory</h2></div><button class="icon-button" data-close="directory-dialog" aria-label="Close player directory">×</button></div>
-    <p class="muted">Keep your regulars here. Check a player to add them to this scrim.</p>
-    <div class="directory-toolbar"><input id="directory-search" type="search" placeholder="Find a name, BattleTag, or role" aria-label="Search player directory"><button id="create-player" class="primary">+ New player</button></div>
+    <div class="dialog-heading"><div><h2>Player directory</h2></div><button class="icon-button" data-close="directory-dialog" aria-label="Close player directory">×</button></div>
+    <p class="muted">Select players to add to this scrim.</p>
+    <div class="directory-toolbar"><input id="directory-search" type="search" placeholder="Search players…" aria-label="Search player directory"><button id="create-player" class="primary">+ New player</button></div>
     <div id="directory-list"></div>
-    <div class="dialog-footer"><span class="muted small">Roster changes save immediately.</span><button class="secondary" data-close="directory-dialog">Done</button></div>
+    <div class="dialog-footer"><span class="muted small">Changes save automatically.</span><button class="secondary" data-close="directory-dialog">Done</button></div>
   </dialog>
 
   <dialog id="player-dialog">
     <form id="player-form">
-      <div class="dialog-heading"><div><p class="eyebrow">PLAYER DETAILS</p><h2 id="player-form-heading">New player</h2></div><button type="button" class="icon-button" data-close="player-dialog" aria-label="Close player editor">×</button></div>
+      <div class="dialog-heading"><div><h2 id="player-form-heading">New player</h2></div><button type="button" class="icon-button" data-close="player-dialog" aria-label="Close player editor">×</button></div>
       <input id="player-id" type="hidden">
-      <label>Display name<input id="player-name" maxlength="80" autocomplete="off" placeholder="What do you call them?"></label>
-      <label>Battle.net account<input id="player-tag" maxlength="100" autocomplete="off" placeholder="Player#1234"></label>
+      <label>Display name<input id="player-name" maxlength="80" autocomplete="off" placeholder="Player name"></label>
+      <label>Battle.net account<input id="player-tag" maxlength="100" autocomplete="off" placeholder="BattleTag#1234"></label>
       <label>Player status<select id="player-status"><option value="default">Default</option><option value="trial">Trial</option><option value="team">Team member</option></select></label>
-      <fieldset><legend>Roles <span class="muted">— choose all that fit</span></legend><div id="player-roles" class="role-checkboxes"></div></fieldset>
-      <label>Notes (optional)<textarea id="player-notes" maxlength="500" rows="3" placeholder="Availability or a quick reminder…"></textarea></label>
+      <fieldset><legend>Roles <span class="muted">— select all that apply</span></legend><div id="player-roles" class="role-checkboxes"></div></fieldset>
+      <label>Notes (optional)<textarea id="player-notes" maxlength="500" rows="3" placeholder="Notes"></textarea></label>
       <p id="player-error" class="error-text" role="alert"></p>
       <div class="dialog-footer"><button type="button" class="quiet danger" id="delete-player">Delete player</button><span class="muted small">Changes save automatically</span><button type="submit" class="primary">Done</button></div>
     </form>
+  </dialog>
+  <dialog id="swaps-dialog" aria-labelledby="swaps-heading">
+    <div class="dialog-heading"><h2 id="swaps-heading">Lineup swaps</h2><button class="icon-button" data-close="swaps-dialog" aria-label="Close swaps">×</button></div>
+    <p id="swaps-source" class="muted small"></p>
+    <div id="swaps-list"></div>
+    <label id="swaps-message-field" class="field">Message<textarea id="swaps-message" rows="3" readonly></textarea></label>
+    <div class="dialog-footer"><button id="copy-swaps" class="primary">Copy message</button><button class="secondary" data-close="swaps-dialog">Done</button></div>
   </dialog>
   <dialog id="confirm-dialog"><h2 id="confirm-title"></h2><p id="confirm-description" class="muted"></p><div class="dialog-footer"><button id="confirm-cancel" class="secondary">Cancel</button><button id="confirm-accept" class="primary">Continue</button></div></dialog>
   <dialog id="game-editor" aria-labelledby="game-editor-heading">
