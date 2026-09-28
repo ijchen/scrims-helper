@@ -106,6 +106,19 @@
 .catalog-filters button[aria-pressed=true] { background: var(--hover, #e5e7ed); color: inherit; }
 .catalog-results { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; max-height: 48vh; overflow-y: auto; padding: 4px; align-content: start; }
 .catalog-results.map-results { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#edit-map-pool { margin-left: auto; }
+#map-pool-dialog { max-width: 760px; }
+#map-pool-list { max-height: 60vh; overflow-y: auto; padding: 4px; }
+.map-pool-group + .map-pool-group { margin-top: 20px; }
+.map-pool-group h3 { margin-bottom: 8px; }
+.map-pool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; }
+.map-pool-option { cursor: pointer; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--input); }
+.map-pool-option img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.map-pool-option span { display: flex; align-items: center; gap: 6px; padding: 8px; font-size: 12px; }
+.map-pool-option input { margin: 0; }
+.map-pool-option:has(input:not(:checked)) img { opacity: .4; filter: grayscale(1); }
+.map-pool-option:has(:checked) { border-color: var(--selected-border); }
+.map-pool-option:hover { box-shadow: 0 0 0 1px var(--selected-border); }
 .catalog-option { display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 5px; border: 1px solid var(--line); text-align: left; background: var(--input, #fafafa); }
 .catalog-option img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 5px; background: var(--tint, var(--hover, #eee)); }
 .map-results .catalog-option img { aspect-ratio: 16 / 9; }

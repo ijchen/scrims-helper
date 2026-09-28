@@ -41,7 +41,7 @@
     <section id="empty-roster" class="empty-state" hidden><span class="empty-icon" aria-hidden="true">+</span><h2>Add your players</h2><button id="add-players" class="primary">+ Players</button></section>
     <div id="panel-divider" role="separator" tabindex="0" aria-label="Resize roster and games" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="62" aria-controls="board games-section" title="Drag to resize · Arrow keys to adjust · Double-click to reset"></div>
     <section id="games-section" class="games-section" aria-labelledby="games-heading">
-      <div class="section-title"><h2 id="games-heading">Games</h2><button id="undo-game" class="quiet" title="Undo last completed game">↶ Undo game</button></div>
+      <div class="section-title"><h2 id="games-heading">Games</h2><button id="undo-game" class="quiet" title="Undo last completed game">↶ Undo game</button><button id="edit-map-pool" class="quiet">Edit map pool</button></div>
       <div id="mode-tracker" class="mode-tracker" aria-label="Map mode rotation"></div>
       <nav id="game-overview" class="game-history-selector" aria-label="Jump to a completed game" hidden></nav>
       <div id="game-rows" class="game-rows"></div>
@@ -95,6 +95,11 @@
     <input id="catalog-search" type="search" maxlength="100" autocomplete="off" spellcheck="false" aria-label="Search maps or heroes" aria-controls="catalog-results">
     <div id="catalog-filters" class="catalog-filters"></div><div id="catalog-results" class="catalog-results"></div>
     <div class="catalog-footer"><button id="catalog-clear" class="quiet">Clear selection</button><button id="catalog-custom" class="quiet" hidden></button></div>
+  </dialog>
+  <dialog id="map-pool-dialog" aria-labelledby="map-pool-heading">
+    <div class="dialog-heading"><h2 id="map-pool-heading">Map pool</h2><button class="icon-button" data-close="map-pool-dialog" aria-label="Close map pool">×</button></div>
+    <div id="map-pool-list"></div>
+    <div class="dialog-footer"><span class="muted small">Saved automatically for this scrim.</span><button class="secondary" data-close="map-pool-dialog">Done</button></div>
   </dialog>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <div id="bench-drop-hint" role="status" hidden>↓ Drop to bench</div>

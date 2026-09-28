@@ -16,6 +16,8 @@ Open <http://localhost:4173>. Use an HTTP server rather than opening `index.html
 
 ### Maps and bans
 
+**Edit map pool** beside Games toggles maps for this scrim. Disabled maps disappear from map pickers without changing maps already selected or recorded. Changes autosave and travel with exported backups; a new scrim enables all maps again.
+
 Below the roster, **Games** separates **Upcoming** (dashed border), **In progress** (amber border), and **Completed** cards. Every card shows the map image, both banned heroes, and all five players. Click a map or ban to change it; **Edit** also lets you correct who played each role. Historical lineup corrections update total and role-specific playtime automatically without changing the current lineup.
 
 The roster and games scroll independently on landscape displays. All completed games appear newest-first below the active/upcoming game. The horizontal overview stays chronological (Game 1 onward); click a thumbnail to scroll to that game. **Prepare next game** reveals the upcoming planning card during a live game. **Win / Loss / Draw** finish the active game and count playtime. Results remain editable afterward; click the selected result again to clear it. The W/L/D summary counts completed games only. Portrait/narrow displays keep a stacked page layout.
@@ -102,7 +104,6 @@ On NixOS, use your existing Node environment or `nix shell nixpkgs#nodejs` first
 
 ## Next iterations
 
-- Configurable map pools and ban role-conflict feedback.
 - Hero pool images or specialist details if they prove useful later.
 
 These are intentionally deferred while the roster workflow gets real scrim use.

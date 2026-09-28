@@ -86,7 +86,11 @@ export function emptyLineup() {
 }
 
 export function newSession() {
-  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), gameLabel: '', nextGame: emptyGameDetails(), activeGame: null, games: [] };
+  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), gameLabel: '', nextGame: emptyGameDetails(), activeGame: null, games: [], disabledMapIds: [] };
+}
+
+export function enabledMaps(session) {
+  return MAPS.filter(map => !(session.disabledMapIds || []).includes(map.id));
 }
 
 export function newState() {
@@ -320,6 +324,7 @@ export function validateBackup(input) {
   }
   if (!unique(input.players.map(player => player.id))) fail();
   const session = input.session;
+  if (session.disabledMapIds !== undefined && (!list(session.disabledMapIds, 1000) || !session.disabledMapIds.every(identifier) || !unique(session.disabledMapIds))) fail();
   const checkGameDetails = details => {
     if (!object(details)) fail();
     if (details.mode !== undefined && details.mode !== '' && !MODES.includes(details.mode)) fail();
@@ -359,6 +364,7 @@ export function validateBackup(input) {
   if (!unique(session.games.map(game => game.id))) fail();
   const normalized = JSON.parse(JSON.stringify(input));
   normalized.version = STATE_VERSION;
+  normalized.session.disabledMapIds ??= [];
   delete normalized.session.plans;
   for (const player of normalized.players) player.status ??= 'default';
   normalized.session.nextGame = { ...emptyGameDetails(), ...normalized.session.nextGame };

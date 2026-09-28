@@ -1,6 +1,6 @@
 import { MAPS, HEROES } from './catalog.js';
 import { findCatalogItem, searchCatalog } from './search.js';
-import { ROLES, MODES, OUTCOMES, modeRotation, gameWarnings, roleGroup, lineupStatus, replaceGamePlayer, setGameOutcome } from './model.js';
+import { ROLES, MODES, OUTCOMES, modeRotation, gameWarnings, roleGroup, lineupStatus, replaceGamePlayer, setGameOutcome, enabledMaps } from './model.js';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const element = id => document.getElementById(id);
@@ -16,6 +16,22 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   let previousCompletedCount = null;
   const pickerDialog = element('catalog-dialog');
   const editor = element('game-editor');
+  element('edit-map-pool').onclick = () => {
+    const enabled = new Set(enabledMaps(getState().session).map(map => map.id));
+    element('map-pool-list').innerHTML = MODES.map(mode => `<section class="map-pool-group"><h3>${mode}</h3><div class="map-pool-grid">${MAPS.filter(map => map.mode === mode).map(map => `<label class="map-pool-option"><img src="${map.image}" alt="" loading="lazy"><span><input type="checkbox" data-pool-map="${map.id}" ${enabled.has(map.id) ? 'checked' : ''}>${escapeHtml(map.name)}</span></label>`).join('')}</div></section>`).join('');
+    element('map-pool-dialog').showModal();
+    element('map-pool-list').scrollTop = 0;
+  };
+  element('map-pool-list').addEventListener('change', event => {
+    const mapId = event.target.dataset.poolMap;
+    if (!MAPS.some(map => map.id === mapId)) return;
+    const session = getState().session;
+    const disabled = new Set(session.disabledMapIds || []);
+    if (event.target.checked) disabled.delete(mapId);
+    else disabled.add(mapId);
+    session.disabledMapIds = [...disabled];
+    save();
+  });
   const getGame = id => {
     const session = getState().session;
     if (!id) return { ...session.nextGame, label: session.gameLabel, lineup: ROLES.map(role => {
@@ -175,7 +191,7 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   function renderPicker() {
     const maps = picker.field === 'label';
     const query = element('catalog-search').value;
-    const collection = maps ? MAPS : HEROES;
+    const collection = maps ? enabledMaps(getState().session) : HEROES;
     const candidates = collection.filter(item => !filter || (maps ? item.mode : item.role) === filter);
     const matches = searchCatalog(candidates, query).map(item => {
       const candidate = { ...getGame(picker.id), [picker.field]: item.name, ...(maps ? { mode: item.mode } : {}) };
@@ -187,7 +203,7 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
     element('catalog-results').innerHTML = matches.map(({ item, warnings }) => {
       return `<button class="catalog-option ${maps ? '' : item.role} ${warnings.length ? 'has-conflict' : ''}" data-catalog-id="${item.id}" aria-label="${escapeHtml(item.name)}${maps ? `, ${item.mode}` : ''}${warnings.length ? ` · ${warnings.join(' · ')}` : ''}"><img src="${item.image}" alt="" loading="lazy"><strong>${escapeHtml(item.name)}</strong><small>${maps ? item.mode : item.role === 'dps' ? 'DPS' : item.role}</small>${warningText(warnings)}</button>`;
     }).join('') || '<p class="muted">No matches.</p>';
-    element('catalog-custom').hidden = !query.trim();
+    element('catalog-custom').hidden = !query.trim() || (maps && Boolean(findCatalogItem(MAPS, query)));
     element('catalog-custom').textContent = `Use custom ${maps ? 'map' : 'hero'}: ${query.trim()}`;
   }
 
