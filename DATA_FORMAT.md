@@ -76,6 +76,7 @@ initialized), and `session`. Session contains:
 | activeGame | Game record, or null |
 | games | Completed game records, oldest first |
 | disabledMapIds | Unique map IDs excluded for this scrim |
+| bansEnabled | Optional boolean; omitted means true. False hides bans and records new games without bans; existing records are preserved. |
 
 Attendees reference existing directory players. Lineup values are attendee
 player IDs or empty strings for unfilled slots; players cannot appear twice.

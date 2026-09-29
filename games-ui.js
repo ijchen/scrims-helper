@@ -121,7 +121,13 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     </button>`;
   };
 
+  element('toggle-bans').onclick = () => {
+    const session = currentSession(getState());
+    session.bansEnabled = session.bansEnabled === false;
+    save();
+  };
   const banButton = (game, field, id) => {
+    if (currentSession(getState()).bansEnabled === false) return '';
     const hero = catalogItem(HEROES, game[field]);
     const team = field === 'ourBan' ? 'Our ban' : 'Their ban';
     const warnings = gameWarnings(currentSession(getState()), game, id)[field];
@@ -137,6 +143,10 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     cancelGameScroll();
     const state = getState();
     const session = currentSession(state);
+    const bansEnabled = session.bansEnabled !== false;
+    element('toggle-bans').textContent = bansEnabled ? 'Bans on' : 'Bans off';
+    element('toggle-bans').setAttribute('aria-pressed', String(bansEnabled));
+    element('toggle-bans').title = bansEnabled ? 'Turn off hero bans for this scrim' : 'Turn on hero bans for this scrim';
     const readiness = lineupStatus(state);
     const previousSelector = element('game-overview');
     const previousScroll = element('game-rows').scrollTop;

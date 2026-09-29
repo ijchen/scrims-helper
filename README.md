@@ -47,6 +47,10 @@ contact BattleTag and custom game code. **Flip coin** briefly shows a result.
 
 ### Autofill
 
+The **Bans on/off** button beside **Edit map pool** toggles hero bans for the
+current scrim. Turning bans off hides the controls and omits bans from new games,
+without deleting existing recorded bans. Reusing a scrim's setup copies this setting.
+
 Autofill preserves existing selections, including manually chosen off-role or
 absent players. New selections must be present, distinct, and opted into their
 assigned roles. It is disabled when a complete valid lineup is impossible;

@@ -31,7 +31,7 @@
     </section>
     <section class="live-toolbar" aria-label="Lineup controls">
       <div class="game-heading"><h1>Game <span id="next-number">1</span></h1><span id="lineup-status" role="status"></span></div>
-      <div class="game-actions"><button id="clear-lineup" class="quiet" title="Bench all five players">Clear lineup</button><button id="autofill-lineup" class="quiet">Autofill</button><button id="lineup-swaps" data-shift-label="Copy swaps" class="quiet">Swaps</button></div>
+      <div class="game-actions"><button id="clear-lineup" class="secondary compact-action" title="Bench all five players">Clear lineup</button><button id="autofill-lineup" class="secondary compact-action">Autofill</button><button id="lineup-swaps" data-shift-label="Copy swaps" class="secondary compact-action">Swaps</button></div>
     </section>
     <section id="board" class="board" aria-label="Lineup and roster">
       <div id="lineup-strip" class="lineup-strip" aria-label="Next game's five slots"></div>
@@ -42,7 +42,7 @@
     <section id="empty-roster" class="empty-state" hidden><span class="empty-icon" aria-hidden="true">+</span><h2>Add your players</h2><button id="add-players" class="primary">+ Players</button></section>
     <div id="panel-divider" role="separator" tabindex="0" aria-label="Resize roster and games" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="62" aria-controls="board games-section" title="Drag to resize · Arrow keys to adjust · Double-click to reset"></div>
     <section id="games-section" class="games-section" aria-labelledby="games-heading">
-      <div class="section-title"><h2 id="games-heading">Games</h2><button id="undo-game" class="quiet" title="Undo last completed game">↶ Undo game</button><button id="edit-map-pool" class="quiet">Edit map pool</button></div>
+      <div class="section-title"><h2 id="games-heading">Games</h2><button id="undo-game" class="quiet" title="Undo last completed game">↶ Undo game</button><div class="scrim-tools"><button id="toggle-bans" class="secondary compact-action" aria-pressed="true">Bans on</button><button id="edit-map-pool" class="secondary compact-action">Edit map pool</button></div></div>
       <div id="mode-tracker" class="mode-tracker" aria-label="Map mode rotation"></div>
       <nav id="game-overview" class="game-history-selector" aria-label="Jump to a completed game" hidden></nav>
       <div id="game-rows" class="game-rows"></div>

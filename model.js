@@ -14,6 +14,7 @@ export function gameWarnings(session, game, id = '') {
   const mode = game.mode || catalogItem(MAPS, game.map)?.mode;
   if (map && previous.some(entry => identity(entry.map) === map)) warnings.map.push('Map already played');
   if (mode && modeRotation(previous).played.includes(mode)) warnings.map.push('Mode already played this rotation');
+  if (session.bansEnabled === false) return warnings;
   for (const field of ['ourBan', 'theirBan']) {
     const hero = identity(game[field]);
     if (hero && previous.some(entry => identity(entry[field]) === hero)) warnings[field].push('Already banned by this team');
@@ -85,7 +86,7 @@ export function emptyLineup() {
 }
 
 export function newSession() {
-  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), draft: emptyGameDetails(), activeGame: null, games: [], disabledMapIds: [] };
+  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), draft: emptyGameDetails(), activeGame: null, games: [], disabledMapIds: [], bansEnabled: true };
 }
 
 export function enabledMaps(session) {
@@ -121,6 +122,7 @@ export function createScrim(state, id, createdAt, copySetup = false) {
   if (copySetup) {
     session.attendees = currentSession(state).attendees.map(attendee => ({ ...attendee, present: false }));
     session.disabledMapIds = [...currentSession(state).disabledMapIds];
+    session.bansEnabled = currentSession(state).bansEnabled !== false;
   }
   state.scrims.push({ id, createdAt, session });
   state.activeScrimId = id;
@@ -345,7 +347,7 @@ function captureGame(state, id, playedAt) {
     const player = state.players.find(person => person.id === currentSession(state).lineup[role]);
     return { role, playerId: player.id, name: player.name, battletag: player.battletag };
   });
-  return { id, ...gameDetails(currentSession(state).draft), outcome: '', playedAt, lineup };
+  return { id, ...gameDetails(currentSession(state).draft), ...(currentSession(state).bansEnabled === false ? { ourBan: null, theirBan: null } : {}), outcome: '', playedAt, lineup };
 }
 
 export function startGame(state, id, startedAt, markPresent = false) {
