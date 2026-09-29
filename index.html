@@ -14,6 +14,7 @@
   <header class="topbar">
     <a class="brand" href="./" aria-label="Scrims Helper home"><span class="brand-mark">S↗</span><span>Scrims Helper</span></a>
     <nav aria-label="Scrim tools">
+      <button id="manage-directory-button" class="icon-button" aria-label="Player directory" title="Player directory"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1Zm0 0v15"/></svg></button>
       <button id="theme-toggle" class="icon-button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☀</button>
       <button id="settings-button" class="icon-button" aria-label="Settings and backups" title="Settings and backups">⚙</button>
     </nav>
@@ -22,15 +23,15 @@
   <main>
     <div id="storage-warning" class="warning" hidden></div>
     <section class="scrim-summary" aria-label="Scrim overview">
-      <div class="summary-name"><label for="session-title">Scrim name</label><input id="session-title" maxlength="100" placeholder="Scrim name" autocomplete="off"></div>
+      <div class="summary-name"><label for="session-title">Scrim name</label><div class="summary-input"><input id="session-title" maxlength="100" placeholder="Scrim name" autocomplete="off"><button id="scrim-switcher-button" class="secondary" aria-label="Switch scrim" title="Saved scrims">▾</button></div></div>
       <div class="summary-contact"><label for="contact">Contact Battle.net</label><div class="summary-input"><input id="contact" maxlength="100" placeholder="BattleTag#1234" autocomplete="off" spellcheck="false"><button id="copy-contact" class="secondary" aria-label="Copy contact BattleTag" title="Copy contact BattleTag"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg>Copy</button></div></div>
       <div class="summary-stat"><strong id="present-count">0 / 0</strong><span>players here</span></div>
       <div class="summary-stat"><span class="summary-games-line"><strong id="game-count">0</strong><span id="games-record" aria-label="Completed game results"></span></span><span>games played</span></div>
-      <div class="quick-tools"><button id="copy-scrim-code" class="secondary" title="Copy scrim code" aria-label="Copy scrim code DKEEH">DKEEH <span aria-hidden="true">⧉</span></button><button id="coin-flip" class="secondary" title="Flip a coin"><span class="coin-scene" aria-hidden="true"><span id="coin-disc" class="coin-disc"><span class="coin-face coin-heads">H</span><span class="coin-face coin-tails">T</span></span></span><span id="coin-result" aria-live="polite">Flip coin</span></button></div>
+      <div class="quick-tools"><button id="copy-scrim-code" class="secondary" title="Copy scrim code" aria-label="Copy scrim code DKEEH"><span id="scrim-code-label">DKEEH</span><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg></button><button id="coin-flip" class="secondary" title="Flip a coin"><span class="coin-scene" aria-hidden="true"><span id="coin-disc" class="coin-disc"><span class="coin-face coin-heads">H</span><span class="coin-face coin-tails">T</span></span></span><span id="coin-result" aria-live="polite">Flip coin</span></button></div>
     </section>
     <section class="live-toolbar" aria-label="Lineup controls">
       <div class="game-heading"><h1>Game <span id="next-number">1</span></h1><span id="lineup-status" role="status"></span></div>
-      <div class="game-actions"><button id="clear-lineup" class="quiet" title="Bench all five players">Clear lineup</button><button id="autofill-lineup" class="quiet">Autofill</button><button id="lineup-swaps" class="quiet">Swaps</button></div>
+      <div class="game-actions"><button id="clear-lineup" class="quiet" title="Bench all five players">Clear lineup</button><button id="autofill-lineup" class="quiet">Autofill</button><button id="lineup-swaps" data-shift-label="Copy swaps" class="quiet">Swaps</button></div>
     </section>
     <section id="board" class="board" aria-label="Lineup and roster">
       <div id="lineup-strip" class="lineup-strip" aria-label="Next game's five slots"></div>
@@ -46,21 +47,80 @@
       <nav id="game-overview" class="game-history-selector" aria-label="Jump to a completed game" hidden></nav>
       <div id="game-rows" class="game-rows"></div>
     </section>
-    <div class="board-footer"><a class="creator-credit" href="https://github.com/ijchen/scrims-helper" target="_blank" rel="noopener noreferrer">Made with ❤️ by Isaac Chen</a><span id="save-status" class="save-status">Saved on this device</span></div>
+    <div class="board-footer"><div class="footer-credits"><a class="creator-credit" href="https://github.com/ijchen/scrims-helper" target="_blank" rel="noopener noreferrer">Made with ❤️ by Isaac Chen</a><span class="footer-disclaimer"><span aria-hidden="true">·</span>Not affiliated with Blizzard Entertainment</span></div><span id="save-status" class="save-status">Saved on this device</span></div>
   </main>
 
   <dialog id="settings-dialog" aria-labelledby="settings-heading">
-    <div class="dialog-heading"><h2 id="settings-heading">Scrim settings</h2><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
-    <div class="settings-section"><h3>Backup</h3><div class="button-row"><button id="export-button" class="secondary">↓ Export</button><button id="import-button" class="secondary">↑ Import</button><input id="import-file" type="file" accept="application/json,.json" hidden></div><p class="muted small">Saved in this browser. Export to keep or share a copy.</p></div>
-    <div class="dialog-footer"><button id="new-session" class="quiet danger">New scrim</button><button class="primary" data-close="settings-dialog">Done</button></div>
+    <div class="dialog-heading"><h2 id="settings-heading">Scrims Helper settings</h2><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
+    <div class="settings-section"><label class="game-code-setting">Custom game code<input id="custom-game-code" maxlength="20" placeholder="DKEEH" autocomplete="off" spellcheck="false"></label></div>
+    <div class="settings-section"><h3>Backup &amp; transfer</h3><div class="button-row"><button id="export-button" class="secondary transfer-button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3m-4 4 4-4 4 4M4 16v5h16v-5"/></svg>Export</button><button id="import-button" class="secondary transfer-button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>Import</button><input id="import-file" type="file" accept="application/json,.json" hidden></div></div>
+    <div class="settings-section app-credits">
+      <h3>About &amp; credits</h3>
+      <p class="muted small">Scrims Helper is a free, unofficial community tool. It is not affiliated with, endorsed, or sponsored by Blizzard Entertainment.</p>
+      <p class="muted small">Original code is licensed under <a href="LICENSE-MIT" target="_blank" rel="noopener noreferrer">MIT</a> or <a href="LICENSE-APACHE" target="_blank" rel="noopener noreferrer">Apache-2.0</a>, at your option. Third-party artwork and trademarks are excluded. <a href="LICENSE" target="_blank" rel="noopener noreferrer">License scope</a>.</p>
+      <details class="credits-details">
+        <summary>More information</summary>
+        <p class="muted small">Overwatch™ and Battle.net® are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and/or other countries. Game artwork and screenshots are © Blizzard Entertainment and their respective rights holders. All rights reserved.</p>
+        <p class="muted small">Map and hero data and image links come from <a href="https://github.com/TeKrop/overfast-api" target="_blank" rel="noopener noreferrer">OverFast</a>. <a href="ASSETS.md" target="_blank" rel="noopener noreferrer">Asset sources &amp; policies</a>.</p>
+      </details>
+    </div>
+    <div class="dialog-footer"><button id="delete-data-button" class="quiet danger">Delete all saved data</button><button class="primary" data-close="settings-dialog">Done</button></div>
   </dialog>
 
-  <dialog id="directory-dialog">
-    <div class="dialog-heading"><div><h2>Player directory</h2></div><button class="icon-button" data-close="directory-dialog" aria-label="Close player directory">×</button></div>
-    <p class="muted">Select players to add to this scrim.</p>
-    <div class="directory-toolbar"><input id="directory-search" type="search" placeholder="Search players…" aria-label="Search player directory"><button id="create-player" class="primary">+ New player</button></div>
+  <dialog id="export-dialog" aria-labelledby="export-heading">
+    <div class="dialog-heading"><h2 id="export-heading">Export</h2><button class="icon-button" data-close="export-dialog" aria-label="Close export">×</button></div>
+    <div id="export-options" class="transfer-options"></div>
+    <div class="dialog-footer"><button class="secondary" data-close="export-dialog">Cancel</button><button id="export-download" class="primary">Download</button></div>
+  </dialog>
+  <dialog id="storage-recovery-dialog" aria-labelledby="storage-recovery-heading">
+    <h2 id="storage-recovery-heading">This saved data isn’t supported</h2>
+    <p id="storage-recovery-message">This browser has data from an older development version.</p>
+    <p id="storage-recovery-error" class="error-text" role="alert"></p>
+    <div class="dialog-footer"><button id="storage-start-fresh" class="secondary">Start fresh</button><button id="storage-import" class="primary">Import backup</button></div>
+  </dialog>
+  <dialog id="import-dialog" aria-labelledby="import-heading">
+    <div class="dialog-heading"><h2 id="import-heading">Import</h2><button class="icon-button" data-close="import-dialog" aria-label="Close import">×</button></div>
+    <div id="import-options" class="transfer-options"></div>
+    <label id="clear-import-scrims-row" class="transfer-check" hidden><input id="clear-import-scrims" type="checkbox">Clear all existing scrims</label>
+    <p id="import-preview" class="small" aria-live="polite"></p>
+    <div class="dialog-footer"><button class="secondary" data-close="import-dialog">Cancel</button><button id="import-apply" class="primary">Apply import</button></div>
+  </dialog>
+  <dialog id="delete-data-dialog" aria-labelledby="delete-data-heading">
+    <div class="dialog-heading"><h2 id="delete-data-heading">Delete all saved data?</h2><button class="icon-button" data-close="delete-data-dialog" aria-label="Cancel deletion">×</button></div>
+    <p class="small">Permanently delete every scrim, player, preset, custom code, display preference, and legacy recovery save on this browser. This cannot be undone.</p>
+    <label class="game-code-setting">Type “delete everything” to confirm<input id="delete-data-confirmation" autocomplete="off" spellcheck="false"></label>
+    <p id="delete-data-error" class="small" role="alert"></p>
+    <div class="dialog-footer"><button class="secondary" data-close="delete-data-dialog">Cancel</button><button id="delete-data-accept" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/></svg>Delete everything</button></div>
+  </dialog>
+
+  <dialog id="scrim-switcher" aria-labelledby="scrim-switcher-heading">
+    <div class="dialog-heading"><h2 id="scrim-switcher-heading">Your scrims</h2><button class="icon-button" data-close="scrim-switcher" aria-label="Close scrim switcher">×</button></div>
+    <div class="button-row"><button id="create-blank-scrim" class="primary">+ New scrim</button><button id="copy-scrim-setup" class="secondary">Use current roster &amp; map pool</button></div>
+    <div id="saved-scrim-list"></div>
+  </dialog>
+  <dialog id="scrim-editor" aria-labelledby="scrim-editor-heading">
+    <div class="dialog-heading"><h2 id="scrim-editor-heading">Edit scrim</h2><button class="icon-button" data-close="scrim-editor" aria-label="Close scrim editor">×</button></div>
+    <label class="game-code-setting">Scrim name<input id="saved-scrim-name" maxlength="100" autocomplete="off"></label>
+    <div class="dialog-footer"><button id="delete-saved-scrim" data-shift-label="Delete now" class="quiet danger">Delete scrim</button><button class="secondary" data-close="scrim-editor">Done</button></div>
+  </dialog>
+  <dialog id="directory-dialog" aria-labelledby="roster-picker-heading">
+    <div class="dialog-heading"><div><h2 id="roster-picker-heading">Add players</h2></div><button class="icon-button" data-close="directory-dialog" aria-label="Close roster picker">×</button></div>
+    <div class="directory-toolbar"><input id="directory-search" type="search" placeholder="Search players" aria-label="Search player directory"><button id="create-player" class="primary">+ New player</button></div>
     <div id="directory-list"></div>
-    <div class="dialog-footer"><span class="muted small">Changes save automatically.</span><button class="secondary" data-close="directory-dialog">Done</button></div>
+    <div class="dialog-footer"><span id="pending-removals" class="muted small" aria-live="polite"></span><button class="secondary" data-close="directory-dialog" data-apply-removals data-shift-label="Remove now" title="Shift-click to apply removals without confirmation">Done</button></div>
+  </dialog>
+
+  <dialog id="manage-directory-dialog" aria-labelledby="manage-directory-heading">
+    <div class="dialog-heading"><h2 id="manage-directory-heading">Player directory</h2><button class="icon-button" data-close="manage-directory-dialog" aria-label="Close player directory">×</button></div>
+    <div class="directory-toolbar"><input id="manage-directory-search" type="search" placeholder="Search players" aria-label="Search all players"><button id="directory-create-player" class="primary">+ New player</button></div>
+    <div id="manage-directory-list"></div>
+    <div class="dialog-footer"><span id="directory-player-count" class="muted small"></span><button class="secondary" data-close="manage-directory-dialog">Done</button></div>
+  </dialog>
+
+  <dialog id="player-notes-dialog" aria-labelledby="player-notes-heading">
+    <div class="dialog-heading"><h2 id="player-notes-heading">Player notes</h2><button class="icon-button" data-close="player-notes-dialog" aria-label="Close notes">×</button></div>
+    <textarea id="quick-player-notes" maxlength="500" rows="6" aria-labelledby="player-notes-heading" placeholder="Notes"></textarea>
+    <div class="dialog-footer"><span></span><button class="secondary" data-close="player-notes-dialog">Done</button></div>
   </dialog>
 
   <dialog id="player-dialog">
@@ -69,11 +129,11 @@
       <input id="player-id" type="hidden">
       <label>Display name<input id="player-name" maxlength="80" autocomplete="off" placeholder="Player name"></label>
       <label>Battle.net account<input id="player-tag" maxlength="100" autocomplete="off" placeholder="BattleTag#1234"></label>
-      <label>Player status<select id="player-status"><option value="default">Default</option><option value="trial">Trial</option><option value="team">Team member</option></select></label>
-      <fieldset><legend>Roles <span class="muted">— select all that apply</span></legend><div id="player-roles" class="role-checkboxes"></div></fieldset>
+      <label>Player status<select id="player-status"><option value="default">Default</option><option value="trial">Trial</option><option value="team">Team member</option><option value="ringer">Ringer</option></select></label>
+      <fieldset><legend>Roles</legend><div id="player-roles" class="role-checkboxes"></div></fieldset>
       <label>Notes (optional)<textarea id="player-notes" maxlength="500" rows="3" placeholder="Notes"></textarea></label>
       <p id="player-error" class="error-text" role="alert"></p>
-      <div class="dialog-footer"><button type="button" class="quiet danger" id="delete-player">Delete player</button><span class="muted small">Changes save automatically</span><button type="submit" class="primary">Done</button></div>
+      <div class="dialog-footer"><button type="button" class="quiet danger" id="delete-player" data-shift-label="Delete now" title="Shift-click to delete without confirmation">Delete player</button><span class="muted small">Changes save automatically</span><button type="submit" class="primary">Done</button></div>
     </form>
   </dialog>
   <dialog id="swaps-dialog" aria-labelledby="swaps-heading">
@@ -98,10 +158,20 @@
   </dialog>
   <dialog id="map-pool-dialog" aria-labelledby="map-pool-heading">
     <div class="dialog-heading"><h2 id="map-pool-heading">Map pool</h2><button class="icon-button" data-close="map-pool-dialog" aria-label="Close map pool">×</button></div>
+    <div class="pool-shortcuts"><div class="pool-builtins"><button id="map-pool-all" aria-label="Enable all maps">All</button><button id="map-pool-none" aria-label="Disable all maps">None</button></div><div id="map-pool-presets"></div><button id="save-pool-button" class="quiet">+ Save pool</button></div>
     <div id="map-pool-list"></div>
     <div class="dialog-footer"><span class="muted small">Saved automatically for this scrim.</span><button class="secondary" data-close="map-pool-dialog">Done</button></div>
   </dialog>
+  <dialog id="pool-preset-editor" aria-labelledby="pool-preset-heading">
+    <form id="save-map-pool-form">
+      <div class="dialog-heading"><h2 id="pool-preset-heading">Save pool</h2><button type="button" class="icon-button" data-close="pool-preset-editor" aria-label="Close preset editor">×</button></div>
+      <label>Pool name<input id="map-pool-name" maxlength="80" required autocomplete="off"></label>
+      <p id="map-pool-feedback" class="error-text small" role="alert"></p>
+      <div class="dialog-footer"><button id="delete-map-pool" data-shift-label="Delete now" title="Shift-click to delete without confirmation" type="button" class="quiet danger">Delete pool</button><button id="save-preset-submit" class="primary" type="submit">Save</button></div>
+    </form>
+  </dialog>
   <div id="toast" role="status" aria-live="polite" hidden></div>
+  <div id="notes-preview" role="tooltip" hidden></div>
   <div id="bench-drop-hint" role="status" hidden>↓ Drop to bench</div>
 </body>
 </html>

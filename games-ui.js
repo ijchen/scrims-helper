@@ -1,6 +1,7 @@
 import { MAPS, HEROES } from './catalog.js';
 import { findCatalogItem, searchCatalog } from './search.js';
-import { ROLES, MODES, OUTCOMES, modeRotation, gameWarnings, roleGroup, lineupStatus, replaceGamePlayer, setGameOutcome, enabledMaps } from './model.js';
+import { catalogItem, catalogReference, referenceName } from './catalog-references.js';
+import { currentSession, ROLES, MODES, OUTCOMES, modeRotation, gameWarnings, roleGroup, lineupStatus, replaceGamePlayer, setGameOutcome, enabledMaps, saveMapPoolPreset, loadMapPoolPreset, renameMapPoolPreset } from './model.js';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const element = id => document.getElementById(id);
@@ -8,7 +9,7 @@ const warningText = warnings => warnings.length ? `<span class="conflict-note">�
 
 export const finishControls = () => `<div class="finish-controls" role="group" aria-label="Finish game with result">${OUTCOMES.map(outcome => `<button class="finish-result ${outcome}" data-game-action="finish" data-finish-outcome="${outcome}" title="Finish game as a ${outcome} and count playtime">${{ win: 'Win', loss: 'Loss', draw: 'Draw' }[outcome]}</button>`).join('')}</div>`;
 
-export function createGamesUI({ getState, save, action, roleIcon }) {
+export function createGamesUI({ getState, save, action, roleIcon, confirmAction }) {
   let picker = null;
   let filter = '';
   let editingId = null;
@@ -16,8 +17,67 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   let previousCompletedCount = null;
   const pickerDialog = element('catalog-dialog');
   const editor = element('game-editor');
+  let editingPresetId = '';
+  function renderPresetControls() {
+    const enabled = new Set(enabledMaps(currentSession(getState())).map(map => map.id));
+    element('map-pool-all').setAttribute('aria-pressed', String(enabled.size === MAPS.length));
+    element('map-pool-none').setAttribute('aria-pressed', String(enabled.size === 0));
+    element('map-pool-presets').innerHTML = getState().mapPoolPresets.map(preset => {
+      const matches = MAPS.every(map => enabled.has(map.id) === preset.mapIds.includes(map.id));
+      return `<div class="pool-chip"><button data-load-pool="${escapeHtml(preset.id)}" aria-pressed="${matches}" title="Load ${escapeHtml(preset.name)}">${escapeHtml(preset.name)}</button><button data-edit-pool="${escapeHtml(preset.id)}" aria-label="Manage ${escapeHtml(preset.name)}" title="Rename or delete">⋯</button></div>`;
+    }).join('');
+  }
+  function syncPoolCheckboxes() {
+    const enabled = new Set(enabledMaps(currentSession(getState())).map(map => map.id));
+    element('map-pool-list').querySelectorAll('[data-pool-map]').forEach(checkbox => { checkbox.checked = enabled.has(checkbox.dataset.poolMap); });
+    renderPresetControls();
+  }
+  function openPresetEditor(id = '') {
+    editingPresetId = id;
+    const preset = getState().mapPoolPresets.find(preset => preset.id === id);
+    element('pool-preset-heading').textContent = preset ? 'Manage pool' : 'Save pool';
+    element('map-pool-name').value = preset?.name || '';
+    element('map-pool-feedback').textContent = '';
+    element('delete-map-pool').hidden = !preset;
+    element('save-preset-submit').textContent = preset ? 'Rename' : 'Save';
+    element('pool-preset-editor').showModal();
+    element('map-pool-name').focus();
+    element('map-pool-name').select();
+  }
+  element('save-pool-button').onclick = () => openPresetEditor();
+  element('map-pool-presets').onclick = event => {
+    const button = event.target.closest('button');
+    if (button?.dataset.loadPool) {
+      loadMapPoolPreset(getState(), button.dataset.loadPool);
+      save();
+      syncPoolCheckboxes();
+      [...element('map-pool-presets').querySelectorAll('[data-load-pool]')].find(item => item.dataset.loadPool === button.dataset.loadPool)?.focus({ preventScroll: true });
+    }
+    if (button?.dataset.editPool) openPresetEditor(button.dataset.editPool);
+  };
+  element('save-map-pool-form').onsubmit = event => {
+    event.preventDefault();
+    try {
+      if (editingPresetId) renameMapPoolPreset(getState(), editingPresetId, element('map-pool-name').value);
+      else saveMapPoolPreset(getState(), crypto.randomUUID(), element('map-pool-name').value);
+      save();
+      element('pool-preset-editor').close();
+      renderPresetControls();
+    } catch (error) { element('map-pool-feedback').textContent = error.message; }
+  };
+  element('delete-map-pool').onclick = async event => {
+    const preset = getState().mapPoolPresets.find(preset => preset.id === editingPresetId);
+    if (!preset || (!event.shiftKey && !await confirmAction('Delete saved pool?', `Delete “${preset.name}”? This scrim’s map selection stays unchanged.`, 'Delete'))) return;
+    getState().mapPoolPresets = getState().mapPoolPresets.filter(item => item.id !== preset.id);
+    save();
+    element('pool-preset-editor').close();
+    renderPresetControls();
+  };
   element('edit-map-pool').onclick = () => {
-    const enabled = new Set(enabledMaps(getState().session).map(map => map.id));
+    renderPresetControls('');
+    element('map-pool-name').value = '';
+    element('map-pool-feedback').textContent = '';
+    const enabled = new Set(enabledMaps(currentSession(getState())).map(map => map.id));
     element('map-pool-list').innerHTML = MODES.map(mode => `<section class="map-pool-group"><h3>${mode}</h3><div class="map-pool-grid">${MAPS.filter(map => map.mode === mode).map(map => `<label class="map-pool-option"><img src="${map.image}" alt="" loading="lazy"><span><input type="checkbox" data-pool-map="${map.id}" ${enabled.has(map.id) ? 'checked' : ''}>${escapeHtml(map.name)}</span></label>`).join('')}</div></section>`).join('');
     element('map-pool-dialog').showModal();
     element('map-pool-list').scrollTop = 0;
@@ -25,16 +85,27 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   element('map-pool-list').addEventListener('change', event => {
     const mapId = event.target.dataset.poolMap;
     if (!MAPS.some(map => map.id === mapId)) return;
-    const session = getState().session;
+    const session = currentSession(getState());
     const disabled = new Set(session.disabledMapIds || []);
     if (event.target.checked) disabled.delete(mapId);
     else disabled.add(mapId);
     session.disabledMapIds = [...disabled];
+    element('map-pool-feedback').textContent = '';
     save();
+    renderPresetControls();
   });
+  function setAllMaps(enabled) {
+    currentSession(getState()).disabledMapIds = enabled ? [] : MAPS.map(map => map.id);
+    element('map-pool-feedback').textContent = '';
+    element('map-pool-list').querySelectorAll('[data-pool-map]').forEach(checkbox => { checkbox.checked = enabled; });
+    save();
+    renderPresetControls();
+  }
+  element('map-pool-all').onclick = () => setAllMaps(true);
+  element('map-pool-none').onclick = () => setAllMaps(false);
   const getGame = id => {
-    const session = getState().session;
-    if (!id) return { ...session.nextGame, label: session.gameLabel, lineup: ROLES.map(role => {
+    const session = currentSession(getState());
+    if (!id) return { ...session.draft, lineup: ROLES.map(role => {
       const player = getState().players.find(player => player.id === session.lineup[role]);
       return { role, playerId: player?.id || '', name: player?.name || 'Empty' };
     }) };
@@ -42,21 +113,21 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   };
 
   const mapButton = (game, id) => {
-    const map = findCatalogItem(MAPS, game.label);
-    const warnings = gameWarnings(getState().session, game, id).label;
-    return `<button class="game-map ${map ? 'has-image' : ''} ${warnings.length ? 'has-conflict' : ''}" data-game-pick="label" data-game-id="${escapeHtml(id)}" aria-label="Choose map${game.label ? `: ${escapeHtml(game.label)}` : ''}${warnings.length ? ` · ${warnings.join(' · ')}` : ''}">
+    const map = catalogItem(MAPS, game.map);
+    const warnings = gameWarnings(currentSession(getState()), game, id).map;
+    return `<button class="game-map ${map ? 'has-image' : ''} ${warnings.length ? 'has-conflict' : ''}" data-game-pick="map" data-game-id="${escapeHtml(id)}" aria-label="Choose map${referenceName(game.map) ? `: ${escapeHtml(referenceName(game.map))}` : ''}${warnings.length ? ` · ${warnings.join(' · ')}` : ''}">
       ${map ? `<img src="${map.image}" alt="" loading="lazy">` : '<span class="map-placeholder" aria-hidden="true">◇</span>'}
-      <span class="map-caption"><strong>${escapeHtml(game.label || 'Choose map')}</strong><small>${escapeHtml(map?.mode || game.mode || 'Map not set')}</small>${warningText(warnings)}</span>
+      <span class="map-caption"><strong>${escapeHtml(referenceName(game.map) || 'Choose map')}</strong><small>${escapeHtml(game.mode || map?.mode || 'Map not set')}</small>${warningText(warnings)}</span>
     </button>`;
   };
 
   const banButton = (game, field, id) => {
-    const hero = findCatalogItem(HEROES, game[field]);
+    const hero = catalogItem(HEROES, game[field]);
     const team = field === 'ourBan' ? 'Our ban' : 'Their ban';
-    const warnings = gameWarnings(getState().session, game, id)[field];
-    return `<button class="game-ban ${hero?.role || ''} ${warnings.length ? 'has-conflict' : ''}" data-game-pick="${field}" data-game-id="${escapeHtml(id)}" aria-label="${team}: ${escapeHtml(game[field] || 'not set')}${warnings.length ? ` · ${warnings.join(' · ')}` : ''}">
+    const warnings = gameWarnings(currentSession(getState()), game, id)[field];
+    return `<button class="game-ban ${hero?.role || ''} ${warnings.length ? 'has-conflict' : ''}" data-game-pick="${field}" data-game-id="${escapeHtml(id)}" aria-label="${team}: ${escapeHtml(referenceName(game[field]) || 'not set')}${warnings.length ? ` · ${warnings.join(' · ')}` : ''}">
       <span class="ban-portrait">${hero ? `<img src="${hero.image}" alt="" loading="lazy">` : '<span aria-hidden="true">⊘</span>'}</span>
-      <span><small>${team}</small><strong>${escapeHtml(game[field] || 'Choose hero')}</strong>${warningText(warnings)}</span>
+      <span><small>${team}</small><strong>${escapeHtml(referenceName(game[field]) || 'Choose hero')}</strong>${warningText(warnings)}</span>
     </button>`;
   };
 
@@ -65,7 +136,7 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   function render() {
     cancelGameScroll();
     const state = getState();
-    const session = state.session;
+    const session = currentSession(state);
     const readiness = lineupStatus(state);
     const previousSelector = element('game-overview');
     const previousScroll = element('game-rows').scrollTop;
@@ -86,14 +157,14 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
         <header class="game-card-heading"><div><strong>Game ${number}</strong><span class="game-stage ${status}">${status === 'live' ? '● In progress' : status === 'completed' ? '✓ Completed' : 'Upcoming'}</span></div>
           <div class="game-card-actions">${status === 'live' ? '<button class="quiet" data-game-action="cancel">Back to upcoming</button>' : status === 'upcoming' ? `${readiness.absent.length ? `<span class="attendance-warning">${readiness.absent.length} not marked here</span>` : ''}<button class="primary" data-game-action="start" ${session.activeGame || readiness.filled < 5 ? 'disabled' : ''} title="${session.activeGame ? 'Finish the current game first' : readiness.filled < 5 ? 'Choose a player for all five slots first' : readiness.absent.length ? 'Confirm attendance and start the game' : 'Capture these five players and start the game'}">Start game</button>` : ''}${status === 'upcoming' ? '' : `<button class="quiet" data-edit-game="${escapeHtml(id)}" aria-label="Edit Game ${number}">Edit</button>`}</div>
         </header>
-        <div class="game-card-content"><div class="game-map-settings">${mapButton(game, id)}${status === 'upcoming' && game.label.trim() && !findCatalogItem(MAPS, game.label) ? `<label class="field custom-mode-field">Map mode<select id="upcoming-map-mode"><option value="">Choose mode…</option>${MODES.map(mode => `<option ${game.mode === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label>` : ''}</div><div class="game-card-details"><div class="game-bans">${banButton(game, 'ourBan', id)}${banButton(game, 'theirBan', id)}</div>
+        <div class="game-card-content"><div class="game-map-settings">${mapButton(game, id)}${status === 'upcoming' && referenceName(game.map).trim() && !catalogItem(MAPS, game.map) ? `<label class="field custom-mode-field">Map mode<select id="upcoming-map-mode"><option value="">Choose mode</option>${MODES.map(mode => `<option ${game.mode === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label>` : ''}</div><div class="game-card-details"><div class="game-bans">${banButton(game, 'ourBan', id)}${banButton(game, 'theirBan', id)}</div>
         <div class="game-lineup" aria-label="Game ${number} players">${game.lineup.map(slot => `<span class="game-player" title="${escapeHtml(slot.role)}: ${escapeHtml(slot.name)}"><span class="${roleGroup(slot.role)}">${roleIcon(roleGroup(slot.role))}<small>${slot.role}</small></span><strong>${escapeHtml(slot.name)}</strong></span>`).join('')}</div></div></div>
         ${status === 'upcoming' ? '' : status === 'live' ? `<div class="game-outcome">${finishControls()}</div>` : outcomeControls(game)}
       </article>`;
     element('game-overview').hidden = session.games.length === 0;
     element('game-overview').innerHTML = session.games.map((game, index) => ({ game, number: index + 1 })).map(({ game, number }) => {
-        const map = findCatalogItem(MAPS, game.label);
-        return `<button class="history-choice" data-history-game="${escapeHtml(game.id)}" aria-label="Game ${number}: ${escapeHtml(game.label || 'Map not set')}, ${game.outcome || 'result not set'}">${map ? `<img src="${map.image}" alt="" loading="lazy">` : '<span class="history-map-placeholder" aria-hidden="true">◇</span>'}<span><small>Game ${number}</small><strong>${escapeHtml(game.label || 'Map not set')}</strong></span><span class="result-mark ${game.outcome || ''}">${{ win: 'W', loss: 'L', draw: 'D' }[game.outcome] || '—'}</span></button>`;
+        const map = catalogItem(MAPS, game.map);
+        return `<button class="history-choice" data-history-game="${escapeHtml(game.id)}" aria-label="Game ${number}: ${escapeHtml(referenceName(game.map) || 'Map not set')}, ${game.outcome || 'result not set'}">${map ? `<img src="${map.image}" alt="" loading="lazy">` : '<span class="history-map-placeholder" aria-hidden="true">◇</span>'}<span><small>Game ${number}</small><strong>${escapeHtml(referenceName(game.map) || 'Map not set')}</strong></span><span class="result-mark ${game.outcome || ''}">${{ win: 'W', loss: 'L', draw: 'D' }[game.outcome] || '—'}</span></button>`;
       }).join('');
       const upcoming = { game: getGame(''), id: '', number: session.games.length + (session.activeGame ? 2 : 1), status: 'upcoming' };
       element('game-rows').innerHTML = session.activeGame ? `<div class="current-games ${prepareNext ? 'preparing-next' : ''}">${card({ game: session.activeGame, id: session.activeGame.id, number: session.games.length + 1, status: 'live' })}${prepareNext ? card(upcoming) : ''}</div><button class="quiet prepare-next" id="prepare-next" aria-expanded="${prepareNext}">${prepareNext ? 'Hide next game' : `Prepare Game ${upcoming.number} →`}</button>` : card(upcoming);
@@ -172,15 +243,13 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   });
 
   function updateField(id, field, value) {
-    const session = getState().session;
+    const session = currentSession(getState());
     const game = getGame(id);
     if (!game) return;
-    const target = id ? game : session.nextGame;
-    if (field === 'label') {
-      const map = findCatalogItem(MAPS, value);
-      if (id) game.label = value;
-      else session.gameLabel = value;
-      target.mode = map?.mode || '';
+    const target = id ? game : session.draft;
+    if (field === 'map') {
+      target.map = value;
+      target.mode = catalogItem(MAPS, value)?.mode || '';
     } else target[field] = value;
     save();
     if (editor.open) renderEditor();
@@ -189,13 +258,13 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   }
 
   function renderPicker() {
-    const maps = picker.field === 'label';
+    const maps = picker.field === 'map';
     const query = element('catalog-search').value;
-    const collection = maps ? enabledMaps(getState().session) : HEROES;
+    const collection = maps ? enabledMaps(currentSession(getState())) : HEROES;
     const candidates = collection.filter(item => !filter || (maps ? item.mode : item.role) === filter);
     const matches = searchCatalog(candidates, query).map(item => {
-      const candidate = { ...getGame(picker.id), [picker.field]: item.name, ...(maps ? { mode: item.mode } : {}) };
-      const warnings = gameWarnings(getState().session, candidate, picker.id)[picker.field];
+      const candidate = { ...getGame(picker.id), [picker.field]: { id: item.id, name: item.name }, ...(maps ? { mode: item.mode } : {}) };
+      const warnings = gameWarnings(currentSession(getState()), candidate, picker.id)[picker.field];
       return { item, warnings };
     }).sort((first, second) => Number(Boolean(first.warnings.length)) - Number(Boolean(second.warnings.length)));
     element('catalog-filters').innerHTML = [['', 'All'], ...(maps ? MODES.map(mode => [mode, mode]) : [['tank', 'Tank'], ['dps', 'DPS'], ['support', 'Support']])].map(([value, label]) => `<button class="quiet" data-catalog-filter="${value}" aria-pressed="${filter === value}">${label}</button>`).join('');
@@ -212,9 +281,9 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
     if (!id) { prepareNext = true; render(); jumpToGame(''); }
     picker = { id, field };
     filter = initialFilter;
-    element('catalog-heading').textContent = field === 'label' ? 'Choose map' : field === 'ourBan' ? 'Our hero ban' : 'Their hero ban';
+    element('catalog-heading').textContent = field === 'map' ? 'Choose map' : field === 'ourBan' ? 'Our hero ban' : 'Their hero ban';
     element('catalog-search').value = '';
-    element('catalog-search').placeholder = field === 'label' ? 'Search maps…' : 'Search heroes…';
+    element('catalog-search').placeholder = field === 'map' ? 'Search maps' : 'Search heroes';
     renderPicker();
     pickerDialog.showModal();
     element('catalog-search').focus();
@@ -256,21 +325,21 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
       renderPicker();
     }
     if (button.dataset.catalogId) {
-      const item = (picker.field === 'label' ? MAPS : HEROES).find(item => item.id === button.dataset.catalogId);
-      selectPicker(item.name);
+      const item = (picker.field === 'map' ? MAPS : HEROES).find(item => item.id === button.dataset.catalogId);
+      selectPicker({ id: item.id, name: item.name });
     }
   });
-  element('catalog-clear').onclick = () => selectPicker('');
-  element('catalog-custom').onclick = () => selectPicker(element('catalog-search').value.trim().slice(0, 100));
+  element('catalog-clear').onclick = () => selectPicker(null);
+  element('catalog-custom').onclick = () => selectPicker(catalogReference(picker.field === 'map' ? MAPS : HEROES, element('catalog-search').value.trim().slice(0, 100)));
 
   function renderEditor() {
     const game = getGame(editingId);
     if (!game) { editor.close(); return; }
-    const map = findCatalogItem(MAPS, game.label);
+    const map = catalogItem(MAPS, game.map);
     const state = getState();
-    const isActive = editingId && state.session.activeGame?.id === editingId;
-    element('reopen-game').hidden = !editingId || Boolean(state.session.activeGame) || state.session.games.at(-1)?.id !== editingId;
-    element('game-editor-heading').textContent = editingId ? isActive ? 'Edit in-progress game' : `Edit Game ${state.session.games.findIndex(item => item.id === editingId) + 1}` : 'Upcoming game';
+    const isActive = editingId && currentSession(state).activeGame?.id === editingId;
+    element('reopen-game').hidden = !editingId || Boolean(currentSession(state).activeGame) || currentSession(state).games.at(-1)?.id !== editingId;
+    element('game-editor-heading').textContent = editingId ? isActive ? 'Edit in-progress game' : `Edit Game ${currentSession(state).games.findIndex(item => item.id === editingId) + 1}` : 'Upcoming game';
     element('game-editor-fields').innerHTML = `<div class="editor-media">${mapButton(game, editingId)}<div class="game-bans">${banButton(game, 'ourBan', editingId)}${banButton(game, 'theirBan', editingId)}</div></div>${editingId ? outcomeControls(game) : ''}${map ? '' : `<label class="field">Mode (custom map)<select id="custom-map-mode"><option value="">Not set</option>${MODES.map(mode => `<option ${game.mode === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label>`}`;
     element('game-editor-roster').innerHTML = editingId ? game.lineup.map(slot => {
       const options = new Map(game.lineup.map(item => [item.playerId, item.name]));
@@ -298,13 +367,13 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
     const button = event.target.closest('[data-game-pick]');
     if (!button) return;
     event.preventDefault();
-    updateField(button.dataset.gameId, button.dataset.gamePick, '');
+    updateField(button.dataset.gameId, button.dataset.gamePick, null);
   });
 
   document.addEventListener('click', event => {
     const button = event.target.closest('button');
     if (!button) return;
-    if (button.dataset.pickMode) openPicker('', 'label', button.dataset.pickMode);
+    if (button.dataset.pickMode) openPicker('', 'map', button.dataset.pickMode);
     if (button.dataset.historyGame) {
       flashGame(button.dataset.historyGame);
       jumpToGame(button.dataset.historyGame, true);
@@ -330,8 +399,9 @@ export function createGamesUI({ getState, save, action, roleIcon }) {
   });
 
   return {
+    reset() { previousCompletedCount = null; prepareNext = false; picker = null; editingId = null; cancelGameScroll(); element('game-rows').scrollTop = 0; },
     render,
     openPicker,
-    showCurrent() { prepareNext = false; render(); jumpToGame(getState().session.activeGame?.id || ''); },
+    showCurrent() { prepareNext = false; render(); jumpToGame(currentSession(getState()).activeGame?.id || ''); },
   };
 }

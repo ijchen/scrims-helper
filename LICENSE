@@ -1,0 +1,29 @@
+Scrims Helper
+
+Except for third-party materials described below, this project's original
+code, documentation, and original UI artwork are licensed, at your option,
+under either:
+
+  - MIT (see LICENSE-MIT), or
+  - Apache License, Version 2.0 (see LICENSE-APACHE).
+
+SPDX license expression for the original project materials:
+MIT OR Apache-2.0
+
+Third-party exclusions
+
+The hero portraits in assets/heroes/ and map images in assets/maps/ are
+third-party materials and are NOT covered by either project license.
+Blizzard Entertainment and the respective rights holders retain their rights
+in these materials. Their inclusion does not grant a sublicense or permission
+to redistribute, modify, or commercially exploit them. See ASSETS.md for
+sources and relevant Blizzard policies. Reusers must independently ensure
+their use is permitted.
+
+Third-party names, trademarks, and other third-party rights are not licensed
+by this project. Original code and documentation surrounding factual catalog
+entries are covered by the license choice above; no ownership of Blizzard's
+names, artwork, or other intellectual property is claimed.
+
+The original assets/favicon.svg and code-drawn UI graphics are included in
+the project license choice, not in the third-party artwork exclusions.

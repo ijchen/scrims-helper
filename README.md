@@ -1,109 +1,227 @@
 # Scrims Helper
 
-A fast, local-first scrim roster helper. Plain HTML, CSS, and JavaScript: no runtime dependencies, accounts, backend, or build step. The complete original request is preserved in [ORIGINAL_REQUEST.md](ORIGINAL_REQUEST.md).
+A fast, local-first Overwatch scrim manager for coaches: plan lineups, track
+attendance and playtime, and record maps, bans, and results.
 
-## Run locally
+**[Open Scrims Helper](https://ijchen.github.io/scrims-helper/)**
 
-From this folder:
+Plain HTML, CSS, and JavaScript. No accounts, backend, runtime dependencies, or
+build step. Data stays in your browser; exports let you back it up or share it.
+
+## Running a scrim
+
+1. Edit the scrim name and opponent BattleTag in the top bar.
+2. Use **Add player** beneath the roster to select directory players or create
+   new ones. Mark attendance with the circle beside each name.
+3. Fill Tank, HSDPS, FDPS, MS, and FS by clicking players or dragging them into
+   slots. **Autofill** fills the remaining slots with eligible present players.
+4. Choose a map and each team's hero ban. **Start game** captures those settings
+   and the five selected players. If anyone is not marked present, you can
+   confirm their attendance before starting.
+5. Finish with **Win / Loss / Draw** to credit the recorded lineup. During a
+   game, arrange the next lineup and use **Prepare next game** to set its map/bans.
+
+The top bar shows attendance, games played, W/L/D, and copy buttons for the
+contact BattleTag and custom game code. **Flip coin** briefly shows a result.
+
+### Lineup and playtime
+
+- Click a player for their single main role or single open main-role slot.
+  If there are several choices, select a highlighted slot. You can also click
+  an empty slot first, then a player. Escape or clicking outside cancels selection.
+- Hover or focus role headings and empty slots to preview eligible players.
+  Main roles stand out; declared fills have outlined badges; unlisted players dim.
+  Manual unlisted assignments remain possible and are marked pink.
+- Drag onto another player to swap positions. Right-click a player or drag them
+  outside the lineup and player rows to bench them. **Playing as** allows explicit
+  assignments; **Clear lineup** benches everyone. Assignment changes offer **Undo**.
+- Rows sort by attendance, fewest preferred-role games, trial status, then name.
+  In-progress main-role participation counts; fills do not. Bars still show actual games.
+- Segmented bars show total games and Tank / DPS / Support counts, with stripes
+  for the in-progress game. Their shared scale is
+  `max(5, completed games + in-progress game)`.
+- **Swaps** compares the planned five with the active or most recent game.
+  Players staying in are omitted even if they change roles. Substitutions prefer
+  matching role groups, then exact roles. The copyable message uses BattleTags
+  without numeric suffixes, falling back to display names.
+
+### Autofill
+
+Autofill preserves existing selections, including manually chosen off-role or
+absent players. New selections must be present, distinct, and opted into their
+assigned roles. It is disabled when a complete valid lineup is impossible;
+hover the button for the reason.
+
+Complete options are ranked by:
+1. Preferred-playtime fairness: maximize `1 / (preferred games + 1)` for each main-role assignment; fills contribute zero.
+2. Number of trials receiving main-role assignments.
+3. Reduction in squared imbalance across each player's main Tank / DPS / Support groups.
+4. Minimize the sum of `previous fills + 1` for each proposed fill.
+5. Reduction in squared imbalance between main subroles within DPS or Support.
+6. Uniform random choice among exactly tied assignments.
+
+Completed and in-progress games both count, classified using current role preferences.
+Any historical assignment outside current main roles counts as a fill, including
+manual unlisted assignments. Fills consume no preferred-playtime credit and do not
+contribute to main-role balance. Actual game statistics still include every game.
+Role balance rewards improvement,
+not an already-balanced history. Scoring uses exact integer arithmetic and a
+dynamic program over empty-slot subsets. Undo and retry may produce another
+equally good lineup, but can repeat one.
+
+## Player directory and notes
+
+The book icon opens directory management. Search names, BattleTags, roles,
+statuses, or notes; copy BattleTags; and create, edit, or delete players.
+Players created here are not automatically added to the current scrim.
+
+Click a role button to cycle **Unlisted → Main → Fill → Unlisted**; changes save
+immediately. Main roles use filled
+badges; fills use outlined badges. Clicking a player offers only main roles;
+choose a slot first or drag to explicitly assign a fill. A player may have only
+fill roles. Existing role selections remain mains. Statuses are **Default**,
+**Trial**, **Team member**, and **Ringer**. Ringers have a magenta badge; only
+trials receive special sorting/autofill priority.
+
+**Add player** is the separate roster picker. Additions save immediately.
+Unchecking players queues removal; Done, Escape, the close button, or clicking
+outside asks for one bulk confirmation. Cancelling keeps those players;
+rechecking cancels a pending removal. Removing someone from a scrim keeps their
+directory entry. Deleting a directory player removes them from every saved
+scrim's roster and lineup, but preserves historical game snapshots.
+
+Directory rows show one-line notes; players with notes have a note icon in the
+scrim roster. Hover or keyboard-focus either for an immediate preview, or click
+to edit notes directly. Player details and notes save as you type.
+
+## Maps, bans, and history
+
+Cards distinguish **Upcoming**, **In progress**, and **Completed**, with map/hero
+images and the recorded five. Click maps or bans to change them; right-click to
+clear them. **Edit** also corrects recorded players and results. Historical
+lineup corrections update playtime without changing the current lineup.
+
+Known maps set their mode automatically. A mode heading opens its filtered
+picker. Search supports abbreviations, partial names, and small typos; arrow
+keys and Enter work too. Custom maps have a separate mode selector.
+
+Red warnings flag repeated maps, repeated modes in the current rotation,
+repeated bans by the same team, and both teams banning heroes of the same role
+in one game. Conflicting picker options sort last but remain selectable. The
+mode tracker uses completed games and resets after all five modes have appeared.
+
+**Edit map pool** controls which maps appear in this scrim's pickers without
+changing existing records. **All / None** toggle selections; **+ Save pool**
+creates a reusable preset. Clicking a preset copies its selections into the
+scrim; later changes are independent. Its **⋯** menu offers rename and delete.
+
+Completed cards appear newest-first. The horizontal overview runs from Game 1
+onward; clicking an entry scrolls to and briefly highlights its card.
+The latest completed game can be marked in progress again. **Undo game** removes
+the last completed game and restores its map/bans to the upcoming draft.
+**Back to upcoming** cancels a start, protecting separately prepared next-game settings.
+
+Wide landscape windows have independently scrolling roster and game panels with
+a draggable divider. Narrow or portrait windows stack the panels.
+
+## Saved scrims and settings
+
+Click **▾** beside the scrim name to switch scrims, create a blank one, or reuse
+the current roster and map pool. Reusing a setup resets attendance and starts
+without games or a lineup. Previous scrims, including active games, stay saved.
+The **⋯** menu renames or deletes a scrim; the last scrim cannot be deleted.
+Up to 100 scrims can be saved.
+
+Each scrim owns its contact, attendance, lineup, map pool, draft, and history.
+The directory, pool presets, and custom game code are shared. Settings lets you
+override the default code, `DKEEH`; a blank value restores it. The theme defaults
+to charcoal dark. Theme and divider position stay device-local, outside transfers.
+
+### Shift-click shortcuts
+
+Hold **Shift** to see shortcut labels and highlights:
+- **Swaps → Copy swaps** copies directly. No substitutions leaves the clipboard
+  unchanged; a clipboard error opens the message for manual copying.
+- Individual player, scrim, and saved-pool delete buttons skip confirmation.
+  Text buttons show **Delete now**; directory trash buttons highlight pink.
+- Roster-picker **Done → Remove now** applies pending removals without confirmation.
+  Escape and outside-click still confirm.
+
+Shift never enables disabled actions or bypasses the typed delete-all confirmation.
+
+## Saving, sharing, and recovery
+
+Changes save automatically in browser `localStorage`. Different devices,
+browsers, origins, and private browsing sessions have separate storage. Clearing
+site data removes local saves. Data is not sent to GitHub; there is no live
+collaboration or automatic cross-device synchronization. Export regularly.
+
+**Export** offers Player directory, Scrims, Map pool presets, and Custom game
+code. Custom code starts unchecked. Scrims cannot be selected without the
+directory; unchecking the directory also unchecks scrims.
+
+**Import** previews changes before you apply them. Included categories default
+to **Replace**:
+- **Replace** replaces the entire category.
+- **Merge** adds new IDs and updates matching IDs without removing unrelated
+  entries. Available for players, scrims, and presets.
+- **Skip**, or a category absent from the file, leaves it unchanged.
+
+Importing scrims requires importing players. Replacing players also requires
+replacing scrims or explicitly clearing them. Player updates affect retained
+scrims using those players. Conflicting preset names must be resolved before
+merging. The combined result is validated and saved together.
+
+Player and scrim UUIDs survive transfers; names are not used to match identities.
+V1 is the first supported public data format. Prerelease saves and exports
+are not supported. An unsupported or unreadable save opens a blocking dialog
+with **Start fresh** and **Import backup**. Nothing is cleared until you
+explicitly reset or apply a valid import. Start fresh clears this app's data
+and preferences on this browser; it does not affect other sites.
+
+Another tab changing saved data pauses writes in the current tab: reload
+before continuing. **Delete all saved data** in settings requires typing
+`delete everything`.
+
+See [DATA_FORMAT.md](DATA_FORMAT.md) for the v1 storage and export contract.
+
+## Development and deployment
+
+Serve the folder locally:
 
 ```sh
 python3 -m http.server 4173 --bind 127.0.0.1
 ```
 
-Open <http://localhost:4173>. Use an HTTP server rather than opening `index.html` directly, because the app uses JavaScript modules. Keep using the same hostname and port to access your saved data.
+Open <http://localhost:4173>. Use an HTTP server rather than opening `index.html`
+directly because the app uses JavaScript modules. Keep the same hostname and port
+to access the same browser storage.
 
-## A scrim in a few clicks
-
-### Maps and bans
-
-**Edit map pool** beside Games toggles maps for this scrim. Disabled maps disappear from map pickers without changing maps already selected or recorded. Changes autosave and travel with exported backups; a new scrim enables all maps again.
-
-Below the roster, **Games** separates **Upcoming** (dashed border), **In progress** (amber border), and **Completed** cards. Every card shows the map image, both banned heroes, and all five players. Click a map or ban to change it; **Edit** also lets you correct who played each role. Historical lineup corrections update total and role-specific playtime automatically without changing the current lineup.
-
-The roster and games scroll independently on landscape displays. All completed games appear newest-first below the active/upcoming game. The horizontal overview stays chronological (Game 1 onward); click a thumbnail to scroll to that game. **Prepare next game** reveals the upcoming planning card during a live game. **Win / Loss / Draw** finish the active game and count playtime. Results remain editable afterward; click the selected result again to clear it. The W/L/D summary counts completed games only. Portrait/narrow displays keep a stacked page layout.
-
-On landscape displays at least 1100px wide, roster and games sit side by side within the viewport. Header, lineup slots, and game controls stay visible; long rosters or expanded game details scroll inside their own panels. Portrait and smaller windows retain the stacked layout.
-
-**Start game** captures the chosen five and the map/bans without adding playtime. **Finish game +1** credits that captured lineup, even if you have already started arranging the next five. You can prepare the next map and bans while a game is in progress. **Back to upcoming** undoes a start; it asks you to clear any separately prepared upcoming map/bans first rather than overwriting them. The most recent completed game's editor has **Mark in progress** to reverse an early finish. All stages and edits autosave and survive reloads.
-
-Map/hero pickers show images and support case/accent-insensitive search, common abbreviations (`kr`, `gib`, `brig`, `76`), partial names, and small typos. Arrow keys and Enter work too. Known maps set their mode automatically. Custom names remain possible; set a custom map's mode through **Details/Edit**. The local catalog and bundled images are documented in [ASSETS.md](ASSETS.md); map pools and ban-role rules are not enforced yet.
-
-The mode tracker uses completed games only and starts a fresh rotation after all five modes have been played. Repeated modes count once per rotation. Map corrections, reopening, and undo recalculate it. Existing backups remain compatible: old logged games become completed cards, not drafts.
-
-The overview bar keeps the contact BattleTag (edit and one-click copy), next map/note, attendance, and games played on the main screen. Edits save automatically. Click the games-played count to open the log.
-
-Use **Flip coin** for an instant heads/tails result (click again to reflip). The theme toggle switches between light and dark; it initially follows your system theme and remembers your choice on this browser. Lineup players have a neutral gray highlight and silver border, with their current role in a colored icon beside attendance. Off-role fills have a pink icon and assignment control.
-
-Dark mode uses neutral **Charcoal**. Switch themes using the sun/moon button beside the settings gear at the top right. Support uses healing green, DPS reddish orange, and tank blue in both themes.
-
-1. Open **+ Players** to create players or check existing ones into this scrim. Choose their roles and **Default**, **Trial**, or **Team member** status.
-2. Each player has one row, with present players first and then fewest games. Click anywhere on their strip to put them in: a single usual role is chosen immediately; for flex players, a single open eligible slot is chosen automatically. If several are open, they highlight with dashed borders while other slots and players dim; if none are open, all their usual roles highlight. Pick beside the player's name or in the lineup strip. Nothing shifts during selection. Attendance, assignment dropdowns, copy, and edit controls keep their separate actions. Clicking an already-assigned player leaves them in place. Escape or clicking their strip again cancels a choice.
-3. Toggle the circle beside a name to mark attendance. Absent players have dimmed rows and a **Not here** badge. Planning never changes attendance automatically. With five slots filled, **Start game** remains available even if attendance is missing: it lists those players and offers **Mark them here & start**. Cancel, Escape, or clicking outside leaves everything unchanged; unselected players are never marked present by this action.
-4. Click **Start game** when the five enter the match, then **Finish game +1** afterward. Only completed games count. Each row shows total games plus smaller bars for tank, DPS (HSDPS + FDPS), and support (MS + FS). All bars share a scale of `max(5, games completed this scrim)`. **Undo game** updates the counts immediately. Sorting puts present players first, then fewest total games, then trials, then alphabetical order.
-
-The roster always shows everyone, with one row per player. Use the role-heading hover previews to find eligible players without hiding anyone.
-
-**Autofill** fills only empty slots and keeps all existing selections, including off-role or absent players you selected manually. New selections must be present, distinct, and opted into the assigned role. It either produces a complete lineup or changes nothing and explains which roles lack enough eligible players. Undo restores the previous lineup.
-
-Autofill ranks complete options by these criteria, in order:
-1. Largest playtime fairness gain: each added player contributes `1 / (games played + 1)`.
-2. Largest reduction in total squared imbalance across each player's opted-in Tank / DPS / Support groups.
-3. Largest reduction in squared imbalance between opted-in subroles within DPS or Support.
-4. Most trials added (ahead of both default and team members).
-5. Uniform random choice among equally ranked complete assignments. Undo and retry may give another equally good lineup, but can also repeat it.
-
-Completed and in-progress snapshots both count toward these calculations. Role balance measures improvement, not existing imbalance; fixed selections contribute the same amounts to every candidate and need not be scored. Harmonic gains are compared with exact integer arithmetic, and role-balance gains are scaled to integers, so numerical rounding does not break ties. A dynamic program over at most 32 slot subsets finds globally optimal assignments without enumerating every lineup; it tracks the number of tied assignments to sample fairly.
-
-**Swaps**, beside **Clear lineup**, compares your selected five with the in-progress game, or the most recent completed game if none is active. Players staying in are omitted even if they change roles. Incoming and outgoing players are paired to minimize cross-role-group substitutions, then prefer exact roles. The popup shows each pair and a copyable message using BattleTags without the numeric suffix (falling back to display names). Fill all five slots first; this only prepares a message and does not change attendance or either lineup.
-
-Drag a player onto an occupied slot or another player's row to swap their positions. Bench-to-lineup swaps work in either direction; two benched players stay benched. Off-role swaps are allowed and turn pink. Drop on an empty slot to move there, or outside the lineup and player rows to bench someone. **Undo** restores both sides of a swap.
-
-Hover the Tank, DPS, or Support heading above the lineup to highlight players with any role in that group, even when the slots are filled. Hover an empty lineup slot to highlight players who play that exact role instead. Other players dim; moving away restores the roster. This is a preview only: it does not change assignments or counts. Keyboard focus offers the same previews.
-
-The **Playing as** dropdown remains available for explicit assignments, including off-roles; **Bench** sits a player out. Assigning an occupied slot automatically benches its previous player. Swaps and game undo show a temporary **Undo** action. The copy icon beside **⋯** copies a player's BattleTag in one click; it is disabled when no BattleTag is set. Click **⋯** to edit their details. Trial/team badges are informational and do not change counts or ordering.
-
-The **Playing as** dropdown includes off-role fills, marked with a pink badge and dropdown that explicitly says **off-role**. Dropdown assignments replace the destination and clear the player's previous slot; dragging onto an occupied slot swaps both players instead. Changes can be undone. The player's usual roles remain unchanged, and logged games count toward the role actually filled. Off-role lineups survive backups too.
-
-To bench someone, right-click their player row or occupied lineup slot, or drag them outside the lineup strip and player rows. A **Drop to bench** hint confirms a bench drop before you release. Dropping onto another player swaps positions instead. Canceling a drag or dropping outside the browser does not bench them. **Undo** restores the assignment; attendance and game counts stay unchanged.
-
-Popups close when you click outside or press Escape. Player details save as you edit, including partially entered new players. Players without roles remain available under **Choose roles**. Clicking outside a confirmation cancels that action.
-
-Games and their recorded lineups are visible directly in the Games panel. Edit the scrim name and opponent BattleTag in the summary bar. The gear opens settings for a new scrim and import/export. The old Plans & history dialog and saved-plan field are removed. Original legacy saves remain available as recovery copies.
-
-Editing a player's opted-in roles keeps their current assignment; any nonmatching current assignment appears as an off-role fill. Removing a player does not erase played-game history. Starting a new scrim retains the directory and clears this scrim's attendance, lineup, and history; export first to retain a record.
-
-## Saving and sharing
-
-Old Scrimside saves and preferences migrate automatically without overwriting the originals. The temporary legacy-key lookup is scheduled for code review/removal on October 12, 2026; it does not expire automatically. See [MIGRATIONS.md](MIGRATIONS.md) for recovery details and the cleanup checklist.
-
-Changes automatically save to `localStorage` under `scrims-helper.state` (format version 2). **Export** downloads a JSON backup of the directory and current scrim. **Import** validates a backup and asks before replacing your current data. Backups are snapshots, not merges or live collaboration.
-
-Data stays in your browser and is not sent to GitHub. Different devices, browsers, website origins, and private browsing sessions have separate storage. Clearing site data removes local saves. Export regularly, especially before starting a new scrim. Another tab changing saved data pauses writes in this tab; reload to use the latest saved state or export this tab first.
-
-## GitHub Pages
-
-Repository: <https://github.com/ijchen/scrims-helper>
-
-Website: <https://ijchen.github.io/scrims-helper/>
-
-In repository **Settings → Pages**, set the source to **GitHub Actions**. Pushing to `master` runs the model tests and deploys the website through `.github/workflows/pages.yml`. You can also run that workflow manually from the Actions tab.
-
-Only website HTML, CSS, JavaScript, bundled map/hero images, and `.nojekyll` are included in the deployed artifact. All asset paths are relative, so repository-subpath hosting works without configuration. Never commit roster backups or secrets.
-
-To move your existing local roster to the hosted website, **Export** from your local app, open the website, then **Import** that file. The two origins have separate browser storage; updates to the website do not erase its saved roster.
-
-## Development checks
-
-Node.js 22+ runs the data-model tests with no installation step:
+Run tests with Node.js 22 or newer; no dependency installation is needed:
 
 ```sh
 node --test tests/*.test.js
 ```
 
-On NixOS, use your existing Node environment or `nix shell nixpkgs#nodejs` first. The app itself only needs a browser and static file hosting; no changes to `~/nixos` are required.
+GitHub Pages uses **Settings → Pages → GitHub Actions**. Pushing to `master`
+runs tests and deploys through [.github/workflows/pages.yml](.github/workflows/pages.yml);
+the workflow also supports manual runs. The artifact contains the static app,
+bundled assets, and license/asset notices. Paths are relative for repository-subpath
+hosting. Never commit roster backups or secrets.
 
-## Next iterations
+To move local data to the hosted app, export locally and import on the website.
+Deployments do not erase browser saves. Catalog sources and update instructions
+are documented in [ASSETS.md](ASSETS.md).
 
-- Hero pool images or specialist details if they prove useful later.
+## License and attribution
 
-These are intentionally deferred while the roster workflow gets real scrim use.
+Original code, documentation, and original UI artwork are dual-licensed under
+[MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE), at your option. These licenses
+permit commercial reuse of the original project materials; this hosted fan tool
+is provided free of charge.
+
+**Third-party hero and map images are excluded from both licenses.** No rights
+to Blizzard artwork or trademarks are granted by this project. See [license
+scope](LICENSE) and [asset sources and policies](ASSETS.md) before reusing them.
+Scrims Helper is unofficial and is not affiliated with, endorsed, or sponsored
+by Blizzard Entertainment.

@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { autofillLineup, emptyLineup, newState, ROLES } from '../model.js';
+import { currentSession, autofillLineup, emptyLineup, newState, ROLES } from '../model.js';
 
 function add(state, id, roles, history = [], status = 'default', present = true) {
   state.players.push({ id, name: id, battletag: '', roles, status, notes: '' });
-  state.session.attendees.push({ playerId: id, present });
+  currentSession(state).attendees.push({ playerId: id, present });
   history.forEach((role, index) => {
-    state.session.games[index] ??= { id: `game-${index}`, lineup: [] };
-    state.session.games[index].lineup.push({ playerId: id, role });
+    currentSession(state).games[index] ??= { id: `game-${index}`, lineup: [] };
+    currentSession(state).games[index].lineup.push({ playerId: id, role });
   });
 }
 
@@ -15,10 +15,60 @@ function fixture(empty = ROLES) {
   const state = newState();
   for (const role of ROLES.filter(role => !empty.includes(role))) {
     add(state, `fixed-${role}`, [role]);
-    state.session.lineup[role] = `fixed-${role}`;
+    currentSession(state).lineup[role] = `fixed-${role}`;
   }
   return state;
 }
+
+test('declared fills complete lineups but unlisted roles are never autofilled', () => {
+  const state = fixture(['Tank']);
+  add(state, 'volunteer', [], [], 'trial');
+  state.players.at(-1).offRoles = ['Tank'];
+  assert.equal(autofillLineup(state).Tank, 'volunteer');
+  state.players.at(-1).offRoles = [];
+  assert.throws(() => autofillLineup(state));
+});
+
+test('fill history does not consume preferred playtime; current preferences reclassify history', () => {
+  const state = fixture(['Tank']);
+  add(state, 'volunteer', ['Tank'], Array(5).fill('MS'));
+  add(state, 'regular', ['Tank'], ['Tank'], 'trial');
+  assert.equal(autofillLineup(state).Tank, 'volunteer');
+  state.players.find(player => player.id === 'volunteer').roles.push('MS');
+  assert.equal(autofillLineup(state).Tank, 'regular');
+});
+
+test('fill cost spreads courtesies, includes active games, and gives no trial bonus for filling', () => {
+  const state = fixture(['Tank']);
+  add(state, 'repeat', [], ['Tank'], 'trial');
+  state.players.at(-1).offRoles = ['Tank'];
+  add(state, 'fresh', []);
+  state.players.at(-1).offRoles = ['Tank'];
+  assert.equal(autofillLineup(state).Tank, 'fresh');
+  currentSession(state).activeGame = { lineup: [{ playerId: 'fresh', role: 'Tank' }] };
+  assert.equal(autofillLineup(state, () => 0n).Tank, 'fresh');
+  assert.equal(autofillLineup(state, limit => limit - 1n).Tank, 'repeat');
+});
+
+test('a fill earns no benefit simply because the volunteer is underserved', () => {
+  const state = fixture(['Tank']);
+  add(state, 'main', ['Tank'], Array(10).fill('Tank'));
+  add(state, 'fill', [], [], 'trial');
+  state.players.at(-1).offRoles = ['Tank'];
+  assert.equal(autofillLineup(state).Tank, 'main');
+});
+
+test('volunteering can release another fill player to receive preferred playtime', () => {
+  const state = fixture(['Tank', 'HSDPS', 'MS']);
+  add(state, 'Alice', ['Tank'], ['Tank']);
+  add(state, 'Bob', ['HSDPS']);
+  state.players.at(-1).offRoles = ['MS'];
+  add(state, 'Charlie', ['Tank'], ['Tank', 'Tank']);
+  add(state, 'Dan', ['HSDPS'], ['HSDPS']);
+  assert.deepEqual(autofillLineup(state), { ...currentSession(state).lineup, Tank: 'Alice', HSDPS: 'Dan', MS: 'Bob' });
+  state.players.find(player => player.id === 'Alice').offRoles = ['MS'];
+  assert.deepEqual(autofillLineup(state), { ...currentSession(state).lineup, Tank: 'Charlie', HSDPS: 'Bob', MS: 'Alice' });
+});
 
 test('finds a complete assignment instead of greedily stranding a role', () => {
   const state = fixture(['Tank', 'HSDPS']);
@@ -47,10 +97,10 @@ test('never partially fills, repeats players, or uses absent or off-role candida
 test('preserves fixed players including absent off-role assignments', () => {
   const state = fixture(['FS']);
   state.players[0].roles = ['FS'];
-  state.session.attendees[0].present = false;
+  currentSession(state).attendees[0].present = false;
   add(state, 'support', ['FS']);
-  assert.deepEqual(autofillLineup(state), { ...state.session.lineup, FS: 'support' });
-  state.session.lineup.FS = state.session.lineup.Tank;
+  assert.deepEqual(autofillLineup(state), { ...currentSession(state).lineup, FS: 'support' });
+  currentSession(state).lineup.FS = currentSession(state).lineup.Tank;
   assert.throws(() => autofillLineup(state), /Check the selected players/);
 });
 
@@ -71,14 +121,14 @@ test('playtime wins over role balance and trial status; active games count', () 
   add(state, 'less-played', ['FS'], ['FS']);
   add(state, 'trial', ['FS', 'FDPS'], ['FDPS', 'FDPS'], 'trial');
   assert.equal(autofillLineup(state).FS, 'less-played');
-  state.session.activeGame = { lineup: [{ playerId: 'less-played', role: 'FS' }] };
+  currentSession(state).activeGame = { lineup: [{ playerId: 'less-played', role: 'FS' }] };
   assert.equal(autofillLineup(state).FS, 'trial');
 });
 
 test('improves group balance instead of penalizing unbalanced histories', () => {
   const state = fixture(['FS']);
   add(state, 'unbalanced', ['FDPS', 'FS'], Array(4).fill('FDPS'));
-  add(state, 'balanced', ['FDPS', 'FS'], ['FDPS', 'FDPS', 'FS', 'FS'], 'trial');
+  add(state, 'balanced', ['FDPS', 'FS'], ['FDPS', 'FDPS', 'FS', 'FS']);
   assert.equal(autofillLineup(state).FS, 'unbalanced');
 });
 
@@ -91,11 +141,11 @@ test('balances assignments of the same selected people', () => {
   assert.equal(result.HSDPS, 'blair');
 });
 
-test('subroles break group-balance ties before trials', () => {
+test('trial preference outranks main-role balance', () => {
   const state = fixture(['HSDPS']);
   add(state, 'flex-heavy', ['HSDPS', 'FDPS'], ['FDPS', 'FDPS', 'FDPS', 'HSDPS']);
   add(state, 'hitscan-heavy', ['HSDPS', 'FDPS'], ['HSDPS', 'HSDPS', 'HSDPS', 'FDPS'], 'trial');
-  assert.equal(autofillLineup(state).HSDPS, 'flex-heavy');
+  assert.equal(autofillLineup(state).HSDPS, 'hitscan-heavy');
 });
 
 test('trials beat default and team players only on otherwise tied scores', () => {
@@ -120,15 +170,15 @@ test('handles a large flexible roster without enumerating full lineups', () => {
   const result = autofillLineup(state);
   assert.equal(new Set(Object.values(result)).size, 5);
   assert.ok(Object.values(result).every(Boolean));
-  assert.deepEqual(state.session.lineup, emptyLineup());
-  state.session.lineup = result;
+  assert.deepEqual(currentSession(state).lineup, emptyLineup());
+  currentSession(state).lineup = result;
   assert.deepEqual(autofillLineup(state), result);
 });
 
 test('broad-role balance outranks a better subrole balance', () => {
   const state = fixture(['HSDPS']);
   add(state, 'needs-dps', ['HSDPS', 'FDPS', 'FS'], ['HSDPS', 'HSDPS', 'FS', 'FS']);
-  add(state, 'needs-hitscan', ['HSDPS', 'FDPS', 'FS'], ['FDPS', 'FDPS', 'FDPS', 'FS'], 'trial');
+  add(state, 'needs-hitscan', ['HSDPS', 'FDPS', 'FS'], ['FDPS', 'FDPS', 'FDPS', 'FS']);
   assert.equal(autofillLineup(state).HSDPS, 'needs-dps');
 });
 
@@ -155,18 +205,21 @@ test('global optimizer matches exhaustive scoring on varied small rosters', () =
       const roles = ROLES.filter(() => random(3) > 0);
       if (!roles.length) roles.push(ROLES[index % 5]);
       add(state, `player-${index}`, roles, Array.from({ length: random(6) }, () => ROLES[random(5)]), random(3) === 0 ? 'trial' : 'team');
+      state.players.at(-1).offRoles = ROLES.filter(role => !roles.includes(role) && random(2) === 0);
     }
     const score = lineup => ROLES.reduce((total, role) => {
       const player = state.players.find(player => player.id === lineup[role]);
-      const history = state.session.games.flatMap(game => game.lineup.filter(slot => slot.playerId === player.id));
+      const allHistory = currentSession(state).games.flatMap(game => game.lineup.filter(slot => slot.playerId === player.id));
+      const history = allHistory.filter(slot => player.roles.includes(slot.role));
+      if (!player.roles.includes(role)) return [total[0], total[1], total[2], total[3] - (allHistory.length - history.length + 1), total[4]];
       const groups = [...new Set(player.roles.map(group))];
       const before = groups.map(category => history.filter(slot => group(slot.role) === category).length);
       const after = before.map((count, index) => count + Number(groups[index] === group(role)));
       const subroles = player.roles.filter(subrole => group(subrole) === group(role));
       const subBefore = subroles.map(subrole => history.filter(slot => slot.role === subrole).length);
       const subAfter = subBefore.map((count, index) => count + Number(subroles[index] === role));
-      return [total[0] + 1 / (history.length + 1), total[1] + variance(before) - variance(after), total[2] + variance(subBefore) - variance(subAfter), total[3] + Number(player.status === 'trial')];
-    }, [0, 0, 0, 0]);
+      return [total[0] + 1 / (history.length + 1), total[1] + Number(player.status === 'trial'), total[2] + variance(before) - variance(after), total[3], total[4] + variance(subBefore) - variance(subAfter)];
+    }, [0, 0, 0, 0, 0]);
     let best = null;
     function enumerate(lineup, used, index) {
       if (index === ROLES.length) {
@@ -175,7 +228,7 @@ test('global optimizer matches exhaustive scoring on varied small rosters', () =
         return;
       }
       for (const player of state.players) {
-        if (!used.includes(player.id) && player.roles.includes(ROLES[index])) enumerate({ ...lineup, [ROLES[index]]: player.id }, [...used, player.id], index + 1);
+        if (!used.includes(player.id) && [...player.roles, ...(player.offRoles || [])].includes(ROLES[index])) enumerate({ ...lineup, [ROLES[index]]: player.id }, [...used, player.id], index + 1);
       }
     }
     enumerate({}, [], 0);

@@ -135,7 +135,7 @@ export const MAPS = [
     "id": "neon-junction",
     "name": "Neon Junction",
     "mode": "Hybrid",
-    "image": "assets/maps/neon-junction.png",
+    "image": "assets/maps/neon-junction.jpg",
     "aliases": []
   },
   {
