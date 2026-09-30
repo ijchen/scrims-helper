@@ -1,3 +1,17 @@
+export const PRIORITIES = [
+  { value: '1/5', label: '⅕×', numerator: 1, denominator: 5 },
+  { value: '1/4', label: '¼×', numerator: 1, denominator: 4 },
+  { value: '1/3', label: '⅓×', numerator: 1, denominator: 3 },
+  { value: '1/2', label: '½×', numerator: 1, denominator: 2 },
+  { value: '2/3', label: '⅔×', numerator: 2, denominator: 3 },
+  { value: '1', label: '1×', numerator: 1, denominator: 1 },
+  { value: '3/2', label: '1.5×', numerator: 3, denominator: 2 },
+  { value: '2', label: '2×', numerator: 2, denominator: 1 },
+  { value: '3', label: '3×', numerator: 3, denominator: 1 },
+  { value: '4', label: '4×', numerator: 4, denominator: 1 },
+  { value: '5', label: '5×', numerator: 5, denominator: 1 },
+];
+
 export const STATE_VERSION = 1;
 export const ROLES = ['Tank', 'HSDPS', 'FDPS', 'MS', 'FS'];
 export const MODES = ['Control', 'Push', 'Hybrid', 'Escort', 'Flashpoint'];
@@ -31,10 +45,11 @@ export function validateState(input) {
   for (const scrim of input.scrims) {
     if (!fields(scrim, ['id', 'createdAt', 'session']) || !identifier(scrim.id) || (scrim.createdAt !== '' && !date(scrim.createdAt))) fail();
     const session = scrim.session;
-    if (!fields(session, ['title', 'contact', 'attendees', 'lineup', 'draft', 'activeGame', 'games', 'disabledMapIds', ...(Object.hasOwn(session || {}, 'bansEnabled') ? ['bansEnabled'] : [])]) || !string(session.title) || !string(session.contact) || !list(session.attendees, 1000) || !list(session.games, 10000) || !ids(session.disabledMapIds) || !fields(session.draft, ['map', 'mode', 'ourBan', 'theirBan']) || !details(session.draft)) fail();
+    if (!fields(session, ['title', 'contact', 'attendees', 'lineup', 'draft', 'activeGame', 'games', 'disabledMapIds', ...(Object.hasOwn(session || {}, 'bansEnabled') ? ['bansEnabled'] : []), ...(Object.hasOwn(session || {}, 'finished') ? ['finished'] : [])]) || !string(session.title) || !string(session.contact) || !list(session.attendees, 1000) || !list(session.games, 10000) || !ids(session.disabledMapIds) || !fields(session.draft, ['map', 'mode', 'ourBan', 'theirBan']) || !details(session.draft)) fail();
     if (Object.hasOwn(session, 'bansEnabled') && typeof session.bansEnabled !== 'boolean') fail();
+    if (Object.hasOwn(session, 'finished') && (typeof session.finished !== 'boolean' || (session.finished && session.activeGame !== null))) fail();
     for (const attendee of session.attendees) {
-      if (!fields(attendee, ['playerId', 'present']) || !playerIds.has(attendee.playerId) || typeof attendee.present !== 'boolean') fail();
+      if (!fields(attendee, ['playerId', 'present', ...(Object.hasOwn(attendee || {}, 'priority') ? ['priority'] : [])]) || !playerIds.has(attendee.playerId) || typeof attendee.present !== 'boolean' || (Object.hasOwn(attendee, 'priority') && !PRIORITIES.some(priority => priority.value === attendee.priority))) fail();
     }
     const attendeeIds = session.attendees.map(attendee => attendee.playerId);
     if (!unique(attendeeIds) || !fields(session.lineup, ROLES) || !ROLES.every(role => session.lineup[role] === '' || attendeeIds.includes(session.lineup[role])) || !unique(Object.values(session.lineup).filter(Boolean))) fail();

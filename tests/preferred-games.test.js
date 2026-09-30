@@ -13,8 +13,10 @@ test('preferred counts include active mains, exclude fills, and follow current p
   assert.equal(preferredGamesFor(state, 'player'), 1);
   session.activeGame.lineup[0].role = 'MS';
   assert.equal(preferredGamesFor(state, 'player'), 2);
+  assert.equal(preferredGamesFor(state, 'player', false), 1);
   state.players[0].roles.push('FS');
   assert.equal(preferredGamesFor(state, 'player'), 3);
+  assert.equal(preferredGamesFor(state, 'player', false), 2);
   state.players[0].roles = [];
   assert.equal(preferredGamesFor(state, 'player'), 0);
   assert.equal(preferredGamesFor(state, 'missing'), 0);

@@ -99,8 +99,8 @@ test('autofill availability agrees with feasibility, including shared-role bottl
   assert.deepEqual(validateState(state), state);
 });
 
-test('delete everything removes current and legacy app data but leaves unrelated storage alone', () => {
-  const keys = ['scrims-helper.state', 'scrims-helper.theme', 'scrims-helper.panelSplit', 'scrimside.v1', 'scrimside.theme', 'scrimside.panelSplit', 'unrelated'];
+test('delete everything removes app data but leaves unrelated storage alone', () => {
+  const keys = ['scrims-helper.state', 'scrims-helper.theme', 'scrims-helper.panelSplit', 'scrims-helper.barLayout', 'unrelated'];
   const values = new Map(keys.map(key => [key, 'value']));
   deleteSavedData({ removeItem: key => values.delete(key) });
   assert.deepEqual([...values.keys()], ['unrelated']);

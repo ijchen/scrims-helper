@@ -35,17 +35,27 @@ contact BattleTag and custom game code. **Flip coin** briefly shows a result.
 - Drag onto another player to swap positions. Right-click a player or drag them
   outside the lineup and player rows to bench them. **Playing as** allows explicit
   assignments; **Clear lineup** benches everyone. Assignment changes offer **Undo**.
-- Rows sort by attendance, fewest preferred-role games, trial status, then name.
-  In-progress main-role participation counts; fills do not. Bars still show actual games.
-- Segmented bars show total games and Tank / DPS / Support counts, with stripes
-  for the in-progress game. Their shared scale is
+- Rows sort by attendance, fewest preferred-role games including the active game,
+  then fewest completed preferred-role games, trial status, and name.
+  Fills do not count toward sorting. Bars still show actual games.
+- Segmented bars are game-by-game timelines, oldest on the left, with gaps for
+  games sat out. Solid segments are preferred-role games; muted outlines are
+  fills, and stripes indicate the in-progress game. Hover a segment for its
+  game and role. Numbers still show completed counts. Their shared scale is
   `max(5, completed games + in-progress game)`.
+- Settings → **Game bars** can instead group segments on the left: preferred,
+  pending preferred, fills, pending fill. This device-only preference preserves
+  the counts and original game details on hover.
 - **Swaps** compares the planned five with the active or most recent game.
   Players staying in are omitted even if they change roles. Substitutions prefer
   matching role groups, then exact roles. The copyable message uses BattleTags
   without numeric suffixes, falling back to display names.
 
 ### Autofill
+
+**Finish scrim** hides the upcoming game without deleting the lineup, draft, or
+history. **Reopen scrim** brings it back. Finish or cancel an active game first;
+reopening or undoing a completed game also reopens the scrim.
 
 The **Bans on/off** button beside **Edit map pool** toggles hero bans for the
 current scrim. Turning bans off hides the controls and omits bans from new games,
@@ -57,12 +67,22 @@ assigned roles. It is disabled when a complete valid lineup is impossible;
 hover the button for the reason.
 
 Complete options are ranked by:
-1. Preferred-playtime fairness: maximize `1 / (preferred games + 1)` for each main-role assignment; fills contribute zero.
-2. Number of trials receiving main-role assignments.
-3. Reduction in squared imbalance across each player's main Tank / DPS / Support groups.
-4. Minimize the sum of `previous fills + 1` for each proposed fill.
-5. Reduction in squared imbalance between main subroles within DPS or Support.
-6. Uniform random choice among exactly tied assignments.
+1. Weighted preferred-playtime fairness: maximize `priority / (preferred games + 1)` for each main-role assignment; fills contribute zero.
+2. Unweighted preferred-playtime fairness: maximize `1 / (preferred games + 1)`.
+3. Number of trials receiving main-role assignments.
+4. Reduction in squared imbalance across each player's main Tank / DPS / Support groups.
+5. Minimize the sum of `previous fills + 1` for each proposed fill.
+6. Reduction in squared imbalance between main subroles within DPS or Support.
+7. Uniform random choice among exactly tied assignments.
+
+The priority control beside each player's name opens a snapped slider:
+⅕×, ¼×, ⅓×, ½×, ⅔×, 1×, 1.5×, 2×, 3×, 4×, 5×. It defaults to 1×, applies only to
+that scrim, and is included in scrim exports. New scrims (including reused
+rosters) and removed/re-added players start neutral. Non-neutral priorities
+appear as badges; right-click the control to reset to neutral. Row sorting and actual game counts are unchanged.
+Both fairness scores use exact BigInt common-denominator arithmetic, not
+floating-point approximations. Multiplying all priorities by the same factor
+preserves ranking and ties; role constraints may prevent proportional playtime.
 
 Completed and in-progress games both count, classified using current role preferences.
 Any historical assignment outside current main roles counts as a fill, including
@@ -177,8 +197,7 @@ scrims using those players. Conflicting preset names must be resolved before
 merging. The combined result is validated and saved together.
 
 Player and scrim UUIDs survive transfers; names are not used to match identities.
-V1 is the first supported public data format. Prerelease saves and exports
-are not supported. An unsupported or unreadable save opens a blocking dialog
+V1 is the supported data format. An unsupported or unreadable save opens a blocking dialog
 with **Start fresh** and **Import backup**. Nothing is cleared until you
 explicitly reset or apply a valid import. Start fresh clears this app's data
 and preferences on this browser; it does not affect other sites.

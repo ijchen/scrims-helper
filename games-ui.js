@@ -1,7 +1,7 @@
 import { MAPS, HEROES } from './catalog.js';
 import { findCatalogItem, searchCatalog } from './search.js';
 import { catalogItem, catalogReference, referenceName } from './catalog-references.js';
-import { currentSession, ROLES, MODES, OUTCOMES, modeRotation, gameWarnings, roleGroup, lineupStatus, replaceGamePlayer, setGameOutcome, enabledMaps, saveMapPoolPreset, loadMapPoolPreset, renameMapPoolPreset } from './model.js';
+import { currentSession, setScrimFinished, ROLES, MODES, OUTCOMES, modeRotation, gameWarnings, roleGroup, lineupStatus, replaceGamePlayer, setGameOutcome, enabledMaps, saveMapPoolPreset, loadMapPoolPreset, renameMapPoolPreset } from './model.js';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const element = id => document.getElementById(id);
@@ -121,6 +121,12 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     </button>`;
   };
 
+  element('finish-scrim').onclick = () => {
+    setScrimFinished(getState(), !currentSession(getState()).finished);
+    prepareNext = false;
+    save();
+    element('game-rows').scrollTop = 0;
+  };
   element('toggle-bans').onclick = () => {
     const session = currentSession(getState());
     session.bansEnabled = session.bansEnabled === false;
@@ -143,6 +149,10 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     cancelGameScroll();
     const state = getState();
     const session = currentSession(state);
+    element('finish-scrim').textContent = session.finished ? 'Reopen scrim' : 'Finish scrim';
+    element('finish-scrim').disabled = Boolean(session.activeGame);
+    element('finish-scrim').title = session.activeGame ? 'Finish or cancel the current game first' : session.finished ? 'Show the upcoming game again' : 'Mark this scrim done';
+    element('mode-tracker').hidden = Boolean(session.finished);
     const bansEnabled = session.bansEnabled !== false;
     element('toggle-bans').textContent = bansEnabled ? 'Bans on' : 'Bans off';
     element('toggle-bans').setAttribute('aria-pressed', String(bansEnabled));
@@ -177,7 +187,7 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
         return `<button class="history-choice" data-history-game="${escapeHtml(game.id)}" aria-label="Game ${number}: ${escapeHtml(referenceName(game.map) || 'Map not set')}, ${game.outcome || 'result not set'}">${map ? `<img src="${map.image}" alt="" loading="lazy">` : '<span class="history-map-placeholder" aria-hidden="true">◇</span>'}<span><small>Game ${number}</small><strong>${escapeHtml(referenceName(game.map) || 'Map not set')}</strong></span><span class="result-mark ${game.outcome || ''}">${{ win: 'W', loss: 'L', draw: 'D' }[game.outcome] || '—'}</span></button>`;
       }).join('');
       const upcoming = { game: getGame(''), id: '', number: session.games.length + (session.activeGame ? 2 : 1), status: 'upcoming' };
-      element('game-rows').innerHTML = session.activeGame ? `<div class="current-games ${prepareNext ? 'preparing-next' : ''}">${card({ game: session.activeGame, id: session.activeGame.id, number: session.games.length + 1, status: 'live' })}${prepareNext ? card(upcoming) : ''}</div><button class="quiet prepare-next" id="prepare-next" aria-expanded="${prepareNext}">${prepareNext ? 'Hide next game' : `Prepare Game ${upcoming.number} →`}</button>` : card(upcoming);
+      element('game-rows').innerHTML = session.finished ? '<div class="scrim-finished-banner" role="status">✓ Scrim complete</div>' : session.activeGame ? `<div class="current-games ${prepareNext ? 'preparing-next' : ''}">${card({ game: session.activeGame, id: session.activeGame.id, number: session.games.length + 1, status: 'live' })}${prepareNext ? card(upcoming) : ''}</div><button class="quiet prepare-next" id="prepare-next" aria-expanded="${prepareNext}">${prepareNext ? 'Hide next game' : `Prepare Game ${upcoming.number} →`}</button>` : card(upcoming);
     element('game-rows').insertAdjacentHTML('beforeend', session.games.map((game, index) => ({ game, id: game.id, number: index + 1, status: 'completed' })).reverse().map(card).join(''));
     element('game-rows').scrollTop = previousScroll;
     const selector = element('game-overview');

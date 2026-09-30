@@ -2,12 +2,13 @@ import { STORAGE_KEY, STATE_VERSION, validateState } from './model.js';
 
 export const THEME_KEY = 'scrims-helper.theme';
 export const PANEL_SPLIT_KEY = 'scrims-helper.panelSplit';
+export const BAR_LAYOUT_KEY = 'scrims-helper.barLayout';
 
 export function readSavedState(storage) {
-  return storage.getItem(STORAGE_KEY) ?? storage.getItem('scrimside.v1');
+  return storage.getItem(STORAGE_KEY);
 }
 
-export function restoreSavedState(storage, raw) {
+export function restoreSavedState(raw) {
   const input = JSON.parse(raw);
   if (input?.format !== 'scrims-helper-state' || input.version !== STATE_VERSION) {
     const error = new Error('This saved data isn’t supported');
@@ -22,9 +23,9 @@ export function readPreference(storage, key) {
 }
 
 export function isStateStorageKey(key) {
-  return key === null || key === STORAGE_KEY || key === 'scrimside.v1';
+  return key === null || key === STORAGE_KEY;
 }
 
 export function deleteSavedData(storage) {
-  for (const key of [STORAGE_KEY, THEME_KEY, PANEL_SPLIT_KEY, 'scrims-helper.pre-v3', 'scrimside.v1', 'scrimside.theme', 'scrimside.panelSplit']) storage.removeItem(key);
+  for (const key of [STORAGE_KEY, THEME_KEY, PANEL_SPLIT_KEY, BAR_LAYOUT_KEY]) storage.removeItem(key);
 }

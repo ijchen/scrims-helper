@@ -1,8 +1,8 @@
 import { MAPS, HEROES } from './catalog.js';
 import { normalizeSearch } from './search.js';
-import { ROLES, MODES, OUTCOMES, STATE_VERSION } from './schema.js';
+import { ROLES, MODES, OUTCOMES, STATE_VERSION, PRIORITIES } from './schema.js';
 import { catalogItem, referenceName, gameDetails } from './catalog-references.js';
-export { ROLES, MODES, OUTCOMES, STATE_VERSION, validateState } from './schema.js';
+export { ROLES, MODES, OUTCOMES, STATE_VERSION, PRIORITIES, validateState } from './schema.js';
 
 export function gameWarnings(session, game, id = '') {
   const timeline = [...session.games, ...(session.activeGame ? [session.activeGame] : [])];
@@ -86,7 +86,12 @@ export function emptyLineup() {
 }
 
 export function newSession() {
-  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), draft: emptyGameDetails(), activeGame: null, games: [], disabledMapIds: [], bansEnabled: true };
+  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), draft: emptyGameDetails(), activeGame: null, games: [], disabledMapIds: [], bansEnabled: true, finished: false };
+}
+
+export function setScrimFinished(state, finished) {
+  if (finished && currentSession(state).activeGame) throw new Error('Finish or cancel the current game first.');
+  currentSession(state).finished = finished;
 }
 
 export function enabledMaps(session) {
@@ -120,7 +125,7 @@ export function createScrim(state, id, createdAt, copySetup = false) {
   if (state.scrims.length >= 100) throw new Error('You can save up to 100 scrims. Export a backup before deleting older scrims.');
   const session = newSession();
   if (copySetup) {
-    session.attendees = currentSession(state).attendees.map(attendee => ({ ...attendee, present: false }));
+    session.attendees = currentSession(state).attendees.map(attendee => ({ playerId: attendee.playerId, present: false }));
     session.disabledMapIds = [...currentSession(state).disabledMapIds];
     session.bansEnabled = currentSession(state).bansEnabled !== false;
   }
@@ -179,10 +184,10 @@ export function gamesFor(state, playerId, group = null) {
   return currentSession(state).games.filter(game => game.lineup.some(slot => slot.playerId === playerId && (group === null || roleGroup(slot.role) === group))).length;
 }
 
-export function preferredGamesFor(state, playerId) {
+export function preferredGamesFor(state, playerId, includeActive = true) {
   const roles = state.players.find(player => player.id === playerId)?.roles || [];
   const session = currentSession(state);
-  return [...session.games, ...(session.activeGame ? [session.activeGame] : [])].filter(game => game.lineup.some(slot => slot.playerId === playerId && roles.includes(slot.role))).length;
+  return [...session.games, ...(includeActive && session.activeGame ? [session.activeGame] : [])].filter(game => game.lineup.some(slot => slot.playerId === playerId && roles.includes(slot.role))).length;
 }
 
 function randomBelow(limit) {
@@ -228,6 +233,14 @@ export function autofillUnavailableReason(state) {
   } catch (error) { return error.message; }
 }
 
+export function setPlayerPriority(state, playerId, value) {
+  if (!PRIORITIES.some(priority => priority.value === value)) throw new Error('Choose a supported priority.');
+  const attendee = currentSession(state).attendees.find(entry => entry.playerId === playerId);
+  if (!attendee) throw new Error('Player is not in this scrim.');
+  if (value === '1') delete attendee.priority;
+  else attendee.priority = value;
+}
+
 export function autofillLineup(state, chooseRandom = randomBelow) {
   const { lineup, emptyRoles, candidates, fullMask } = autofillCandidates(state);
   if (!emptyRoles.length) return lineup;
@@ -246,8 +259,9 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
     while (second) [first, second] = [second, first % second];
     return first;
   };
+  const priorities = new Map(currentSession(state).attendees.map(attendee => [attendee.playerId, PRIORITIES.find(priority => priority.value === (attendee.priority ?? '1'))]));
   const denominator = candidates.reduce((multiple, player) => {
-    const divisor = BigInt(counts.get(player.id).total + 1);
+    const divisor = BigInt(counts.get(player.id).total + 1) * BigInt(priorities.get(player.id).denominator);
     return multiple / gcd(multiple, divisor) * divisor;
   }, 1n);
   const balanceGain = (values, index) => (12 * values.reduce((sum, count) => sum + count, 0) + 6) / values.length - 12 * values[index] - 6;
@@ -257,10 +271,13 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
     const groupCounts = groups.map(group => ROLES.filter(role => roleGroup(role) === group).reduce((sum, role) => sum + count.roles[role], 0));
     return [player.id, emptyRoles.map(role => {
       if (!playableRoles(player).includes(role)) return null;
-      if (!player.roles.includes(role)) return [0n, 0, 0, -(count.fills + 1), 0];
+      if (!player.roles.includes(role)) return [0n, 0n, 0, 0, -(count.fills + 1), 0];
       const group = roleGroup(role);
       const subroles = ROLES.filter(subrole => roleGroup(subrole) === group && player.roles.includes(subrole));
-      return [denominator / BigInt(count.total + 1), Number(player.status === 'trial'), balanceGain(groupCounts, groups.indexOf(group)), 0, balanceGain(subroles.map(subrole => count.roles[subrole]), subroles.indexOf(role))];
+      const priority = priorities.get(player.id);
+      const unweighted = denominator / BigInt(count.total + 1);
+      const weighted = denominator * BigInt(priority.numerator) / (BigInt(count.total + 1) * BigInt(priority.denominator));
+      return [weighted, unweighted, Number(player.status === 'trial'), balanceGain(groupCounts, groups.indexOf(group)), 0, balanceGain(subroles.map(subrole => count.roles[subrole]), subroles.indexOf(role))];
     })];
   }));
   const compare = (first, second) => {
@@ -269,7 +286,7 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
     }
     return 0;
   };
-  let options = new Map([[0, { score: [0n, 0, 0, 0, 0], ways: 1n, lineup }]]);
+  let options = new Map([[0, { score: [0n, 0n, 0, 0, 0, 0], ways: 1n, lineup }]]);
   for (const player of candidates) {
     const next = new Map(options);
     for (const [mask, option] of options) {
@@ -342,6 +359,7 @@ export function lineupStatus(state) {
 }
 
 function captureGame(state, id, playedAt) {
+  if (currentSession(state).finished) throw new Error('Reopen the scrim before starting another game.');
   if (!lineupStatus(state).ready) throw new Error('Choose five different players and mark them all present first.');
   const lineup = ROLES.map(role => {
     const player = state.players.find(person => person.id === currentSession(state).lineup[role]);
@@ -371,6 +389,7 @@ export function reopenLastGame(state) {
   if (currentSession(state).activeGame) throw new Error('Finish or cancel the current game first.');
   if (!currentSession(state).games.length) throw new Error('No completed game to reopen.');
   const game = currentSession(state).games.pop();
+  currentSession(state).finished = false;
   currentSession(state).activeGame = { ...game, startedAt: game.startedAt || game.playedAt };
 }
 

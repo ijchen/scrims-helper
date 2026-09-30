@@ -1,7 +1,6 @@
 # Scrims Helper data format — v1
 
-V1 is the first supported public format. Prerelease browser saves and exports
-are intentionally unsupported. Future incompatible changes require explicit
+V1 is the supported public format. Future incompatible changes require explicit
 versioning and a supported upgrade path for public v1 data.
 
 ## Browser storage
@@ -25,7 +24,8 @@ least one scrim, and activeScrimId must identify it. Switching scrims changes
 that pointer, not the contents or order of the list.
 
 Theme and divider position are separate localStorage entries,
-`scrims-helper.theme` and `scrims-helper.panelSplit`. They are device-local and
+`scrims-helper.theme`, `scrims-helper.panelSplit`, and `scrims-helper.barLayout`
+(timeline by default, or grouped). They are device-local and
 never included in exports. There is no server-side storage or synchronization.
 
 ## Records
@@ -70,15 +70,22 @@ initialized), and `session`. Session contains:
 | --- | --- |
 | title | Scrim name, possibly empty |
 | contact | Contact BattleTag, possibly empty |
-| attendees | Unique { playerId, present } entries |
+| attendees | Unique { playerId, present, priority? } entries |
 | lineup | Object with Tank, HSDPS, FDPS, MS, FS keys |
 | draft | Upcoming { map, mode, ourBan, theirBan } |
 | activeGame | Game record, or null |
 | games | Completed game records, oldest first |
 | disabledMapIds | Unique map IDs excluded for this scrim |
+| finished | Optional boolean, default false. Hides upcoming games; cannot be true while a game is active. Resuming preserves the draft and history. |
 | bansEnabled | Optional boolean; omitted means true. False hides bans and records new games without bans; existing records are preserved. |
 
-Attendees reference existing directory players. Lineup values are attendee
+Attendees reference existing directory players. Optional priority is an explicit
+multiplier string: "1/5", "1/4", "1/3", "1/2", "2/3", "1", "3/2", "2", "3", "4", or "5".
+Omitted means neutral 1×; setting neutral removes the property. These values map
+to exact integer numerators and denominators, not floating-point approximations.
+It affects autofill only, never raw statistics. Transfers retain
+it; copied setups and removed/re-added attendees reset to neutral.
+Lineup values are attendee
 player IDs or empty strings for unfilled slots; players cannot appear twice.
 Absent and off-role assignments are allowed in the planned lineup.
 
@@ -143,8 +150,7 @@ customGameCode is shared across scrims; blank/whitespace uses the app default
 }
 ```
 
-The schema marker is required: prerelease exports also used version 1, and
-even a players-only prerelease export must not be confused with public v1.
+The schema marker is required for all exports, including partial exports.
 
 data includes only selected categories, with at least one present:
 players, scrims, mapPoolPresets, customGameCode. Scrims are represented as
@@ -178,6 +184,4 @@ not dismiss it. Canceling or failing an import preserves the original data.
 Start fresh explicitly clears app data/preferences; applying a valid import
 replaces the unreadable saved state only after confirmation.
 
-Old storage key detection exists solely to show this reset path, not to
-convert or support old formats. Reset also removes known prerelease keys.
 Other-tab changes pause writes until reload.
