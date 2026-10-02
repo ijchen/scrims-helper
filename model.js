@@ -1,5 +1,6 @@
 import { MAPS, HEROES } from './catalog.js';
 import { normalizeSearch } from './search.js';
+import { defaultScrimTime } from './scrim-time.js';
 import { ROLES, MODES, OUTCOMES, STATE_VERSION, PRIORITIES } from './schema.js';
 import { catalogItem, referenceName, gameDetails } from './catalog-references.js';
 export { ROLES, MODES, OUTCOMES, STATE_VERSION, PRIORITIES, validateState } from './schema.js';
@@ -85,8 +86,8 @@ export function emptyLineup() {
   return Object.fromEntries(ROLES.map(role => [role, '']));
 }
 
-export function newSession() {
-  return { title: '', contact: '', attendees: [], lineup: emptyLineup(), draft: emptyGameDetails(), activeGame: null, games: [], disabledMapIds: [], bansEnabled: true, finished: false };
+export function newSession(now = new Date()) {
+  return { title: '', contact: '', scheduledAt: defaultScrimTime(now), attendees: [], lineup: emptyLineup(), draft: emptyGameDetails(), activeGame: null, games: [], disabledMapIds: [], bansEnabled: true, finished: false };
 }
 
 export function setScrimFinished(state, finished) {
@@ -123,7 +124,7 @@ export function switchScrim(state, id) {
 export function createScrim(state, id, createdAt, copySetup = false) {
   if (state.scrims.some(scrim => scrim.id === id)) throw new Error('Scrim already exists.');
   if (state.scrims.length >= 100) throw new Error('You can save up to 100 scrims. Export a backup before deleting older scrims.');
-  const session = newSession();
+  const session = newSession(createdAt || new Date());
   if (copySetup) {
     session.attendees = currentSession(state).attendees.map(attendee => ({ playerId: attendee.playerId, present: false }));
     session.disabledMapIds = [...currentSession(state).disabledMapIds];

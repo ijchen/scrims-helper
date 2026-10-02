@@ -1,5 +1,6 @@
 import { ROLES, STORAGE_KEY, emptyLineup, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, lineupSwaps, autofillLineup, startGame, finishGame, reopenLastGame, cancelActiveGame } from './model.js';
 import { gameDetails, referenceName } from './catalog-references.js';
+import { defaultScrimTime, easternInput, fromEasternInput, scrimTimeLabel, discordTimestamp } from './scrim-time.js';
 import { createGamesUI } from './games-ui.js';
 import { currentSession, currentScrim, gameCodeFor, allScrims, autofillUnavailableReason, playableRoles, preferredGamesFor, PRIORITIES, setPlayerPriority } from './model.js';
 import { createScrimsUI } from './scrims-ui.js';
@@ -397,6 +398,9 @@ function applyRolePreview() {
     const matchesRole = playerRole => playerRole === role || roleGroup(playerRole) === role;
     const matches = role && player.roles.some(matchesRole);
     const fills = role && !matches && (player.offRoles || []).some(matchesRole);
+    const assignedRole = ROLES.find(slot => currentSession(state).lineup[slot] === player.id);
+    const group = (matches || fills ? roleGroup(role) || role : '') || roleGroup(assignedRole) || roleGroup(player.roles[0]) || 'tank';
+    for (const candidate of ['tank', 'dps', 'support']) row.classList.toggle(candidate, candidate === group);
     row.classList.toggle('fill-preview', Boolean(fills));
     for (const badge of row.querySelectorAll('[data-role-chip]')) badge.classList.toggle('fill-match', Boolean(fills && matchesRole(badge.dataset.roleChip)));
     row.classList.toggle('eligible-preview', Boolean(matches));
@@ -463,6 +467,9 @@ function renderGames() {
 
 function render() {
   renderGameCode();
+  const scheduledAt = currentSession(state).scheduledAt;
+  element('scrim-time-label').textContent = scheduledAt ? scrimTimeLabel(scheduledAt) : 'Set time';
+  element('copy-scrim-time').disabled = !scheduledAt;
   element('session-title').value = currentSession(state).title;
   element('contact').value = currentSession(state).contact;
   element('present-count').textContent = `${currentSession(state).attendees.filter(attendee => attendee.present).length} / ${currentSession(state).attendees.length}`;
@@ -895,6 +902,40 @@ element('player-roles').onclick = event => {
   button.dataset.preference = { none: 'main', main: 'fill', fill: 'none' }[button.dataset.preference];
   updateRoleCycle(button);
   savePlayer();
+};
+
+element('scrim-time-button').onclick = () => {
+  if (!currentSession(state).scheduledAt) {
+    currentSession(state).scheduledAt = defaultScrimTime();
+    commit();
+  }
+  element('scrim-time-input').value = easternInput(currentSession(state).scheduledAt);
+  element('scrim-time-error').hidden = true;
+  element('scrim-time-dialog').showModal();
+};
+element('scrim-time-button').oncontextmenu = event => {
+  event.preventDefault();
+  delete currentSession(state).scheduledAt;
+  commit();
+};
+element('scrim-time-input').onchange = () => {
+  try {
+    currentSession(state).scheduledAt = fromEasternInput(element('scrim-time-input').value);
+    element('scrim-time-error').hidden = true;
+    commit();
+  } catch (error) {
+    element('scrim-time-error').textContent = error.message;
+    element('scrim-time-error').hidden = false;
+  }
+};
+element('copy-scrim-time').onclick = async () => {
+  const scheduledAt = currentSession(state).scheduledAt;
+  if (!scheduledAt) return;
+  const timestamp = discordTimestamp(scheduledAt);
+  try {
+    await navigator.clipboard.writeText(timestamp);
+    notify('Discord timestamp copied');
+  } catch { notify(`Could not copy automatically: ${timestamp}`); }
 };
 
 let priorityPlayerId = '';

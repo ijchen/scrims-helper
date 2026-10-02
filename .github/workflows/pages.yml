@@ -29,7 +29,7 @@ jobs:
           cp LICENSE LICENSE-MIT LICENSE-APACHE ASSETS.md _site/
           cp scrims-ui.js _site/
           cp backups.js backups-ui.js _site/
-          cp schema.js catalog-references.js _site/
+          cp schema.js catalog-references.js scrim-time.js _site/
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site

@@ -45,7 +45,8 @@ export function validateState(input) {
   for (const scrim of input.scrims) {
     if (!fields(scrim, ['id', 'createdAt', 'session']) || !identifier(scrim.id) || (scrim.createdAt !== '' && !date(scrim.createdAt))) fail();
     const session = scrim.session;
-    if (!fields(session, ['title', 'contact', 'attendees', 'lineup', 'draft', 'activeGame', 'games', 'disabledMapIds', ...(Object.hasOwn(session || {}, 'bansEnabled') ? ['bansEnabled'] : []), ...(Object.hasOwn(session || {}, 'finished') ? ['finished'] : [])]) || !string(session.title) || !string(session.contact) || !list(session.attendees, 1000) || !list(session.games, 10000) || !ids(session.disabledMapIds) || !fields(session.draft, ['map', 'mode', 'ourBan', 'theirBan']) || !details(session.draft)) fail();
+    if (!fields(session, ['title', 'contact', 'attendees', 'lineup', 'draft', 'activeGame', 'games', 'disabledMapIds', ...(Object.hasOwn(session || {}, 'scheduledAt') ? ['scheduledAt'] : []), ...(Object.hasOwn(session || {}, 'bansEnabled') ? ['bansEnabled'] : []), ...(Object.hasOwn(session || {}, 'finished') ? ['finished'] : [])]) || !string(session.title) || !string(session.contact) || !list(session.attendees, 1000) || !list(session.games, 10000) || !ids(session.disabledMapIds) || !fields(session.draft, ['map', 'mode', 'ourBan', 'theirBan']) || !details(session.draft)) fail();
+    if (Object.hasOwn(session, 'scheduledAt') && (!date(session.scheduledAt) || new Date(session.scheduledAt).toISOString() !== session.scheduledAt)) fail();
     if (Object.hasOwn(session, 'bansEnabled') && typeof session.bansEnabled !== 'boolean') fail();
     if (Object.hasOwn(session, 'finished') && (typeof session.finished !== 'boolean' || (session.finished && session.activeGame !== null))) fail();
     for (const attendee of session.attendees) {

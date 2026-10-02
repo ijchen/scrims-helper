@@ -24,6 +24,7 @@
     <div id="storage-warning" class="warning" hidden></div>
     <section class="scrim-summary" aria-label="Scrim overview">
       <div class="summary-name"><label for="session-title">Scrim name</label><div class="summary-input"><input id="session-title" maxlength="100" placeholder="Scrim name" autocomplete="off"><button id="scrim-switcher-button" class="secondary" aria-label="Switch scrim" title="Saved scrims">▾</button></div></div>
+      <div class="summary-schedule"><label for="scrim-time-button">Scrim time</label><div class="summary-input"><button class="secondary" id="scrim-time-button" title="Edit scrim time"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg><span id="scrim-time-label">Set time</span></button><button class="secondary" id="copy-scrim-time" aria-label="Copy Discord timestamp" title="Copy Discord timestamp"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg></button></div></div>
       <div class="summary-contact"><label for="contact">Contact Battle.net</label><div class="summary-input"><input id="contact" maxlength="100" placeholder="BattleTag#1234" autocomplete="off" spellcheck="false"><button id="copy-contact" class="secondary" aria-label="Copy contact BattleTag" title="Copy contact BattleTag"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg>Copy</button></div></div>
       <div class="summary-stat"><strong id="present-count">0 / 0</strong><span>players here</span></div>
       <div class="summary-stat"><span class="summary-games-line"><strong id="game-count">0</strong><span id="games-record" aria-label="Completed game results"></span></span><span>games played</span></div>
@@ -50,6 +51,11 @@
     <div class="board-footer"><div class="footer-credits"><a class="creator-credit" href="https://github.com/ijchen/scrims-helper" target="_blank" rel="noopener noreferrer">Made with ❤️ by Isaac Chen</a><span class="footer-disclaimer"><span aria-hidden="true">·</span>Not affiliated with Blizzard Entertainment</span></div><span id="save-status" class="save-status">Saved on this device</span></div>
   </main>
 
+  <dialog id="scrim-time-dialog" aria-labelledby="scrim-time-heading">
+    <div class="dialog-heading"><h2 id="scrim-time-heading">Scrim time</h2><button class="icon-button" data-close="scrim-time-dialog" aria-label="Close scrim time">×</button></div>
+    <label class="game-code-setting">Eastern time<input id="scrim-time-input" type="datetime-local" step="60" min="0001-01-01T00:00" max="9999-12-31T23:59"></label>
+    <p id="scrim-time-error" class="error-text" role="alert" hidden></p>
+  </dialog>
   <dialog id="priority-dialog" aria-labelledby="priority-heading">
     <div class="dialog-heading"><h2 id="priority-heading">Autofill priority</h2><button class="icon-button" data-close="priority-dialog" aria-label="Close priority">×</button></div>
     <div class="priority-summary"><span id="priority-player"></span><output id="priority-value" for="priority-slider" aria-live="polite">1×</output></div>

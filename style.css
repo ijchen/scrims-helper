@@ -58,7 +58,7 @@ textarea { resize: vertical; }
 .topbar nav { display: flex; gap: 12px; align-items: center; margin-left: auto; }
 .topbar .icon-button { display: grid; place-items: center; line-height: 1; }
 main { max-width: 1600px; padding: 18px 32px; margin: auto; }
-.scrim-summary { display: grid; grid-template-columns: minmax(180px, 1.3fr) minmax(130px, 1fr) auto auto auto; align-items: center; gap: 16px; background: white; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; }
+.scrim-summary { display: grid; grid-template-columns: minmax(150px, 1.3fr) auto minmax(130px, 1fr) auto auto auto; align-items: center; gap: 16px; background: white; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; }
 .quick-tools { display: grid; gap: 2px; }
 .quick-tools button { font-size: 11px; padding: 7px 10px; }
 #coin-flip { width: 100px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-start; gap: 8px; transition: background-color .15s, box-shadow .15s; }
@@ -73,10 +73,15 @@ main { max-width: 1600px; padding: 18px 32px; margin: auto; }
   #coin-flip { transition: none; }
 }
 .scrim-summary label { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
-.summary-input { display: flex; gap: 6px; }
+.summary-input { display: flex; gap: 6px; min-height: 36px; }
 .summary-input button { display: flex; align-items: center; gap: 6px; padding: 8px 10px; }
 .scrim-summary input { padding: 8px 10px; }
 .summary-contact, .summary-name { min-width: 0; }
+.summary-schedule { min-width: 0; }
+.summary-schedule button { min-height: 35px; font-size: 12px; white-space: nowrap; }
+.summary-schedule svg { flex-shrink: 0; }
+#scrim-time-button { min-width: 0; text-align: left; }
+#scrim-time-dialog { max-width: 380px; }
 .summary-stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 12px; white-space: nowrap; }
 .summary-stat strong { font-size: 22px; font-variant-numeric: tabular-nums; }
 .summary-stat span { font-size: 11px; font-weight: 400; color: var(--muted); }
@@ -459,12 +464,16 @@ legend { font-size: 12px; font-weight: 600; margin-bottom: 10px; }
   .roster-row, .roster-head { grid-template-columns: 80px minmax(130px, 1fr) 145px minmax(120px, .7fr) 96px; gap: 12px; padding: 6px 10px; }
 }
 
+@media (min-width: 761px) and (max-width: 1000px) {
+  .scrim-summary { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+}
+
 @media (max-width: 760px) {
   .game-entry { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .game-entry-number { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; }
   .games-section .section-title { flex-wrap: wrap; gap: 8px; }
   .scrim-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
-  .summary-contact, .summary-name { grid-column: 1 / -1; }
+  .summary-contact, .summary-name, .summary-schedule { grid-column: 1 / -1; }
   .summary-stat { flex-direction: row; gap: 8px; padding: 4px; }
   .quick-tools { grid-column: 1 / -1; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
   .attendance-cell { flex-direction: column; gap: 2px; }

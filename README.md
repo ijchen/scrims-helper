@@ -24,6 +24,15 @@ build step. Data stays in your browser; exports let you back it up or share it.
 The top bar shows attendance, games played, W/L/D, and copy buttons for the
 contact BattleTag and custom game code. **Flip coin** briefly shows a result.
 
+The scrim time in the top bar opens an Eastern-time picker. New scrims default
+to 8 PM Eastern that day; daylight-saving time is handled automatically. The
+adjacent copy button copies a Discord short-time timestamp (`<t:…:t>`), displayed
+in the reader's local timezone. Changes save automatically and travel with scrim
+exports. Right-click the time to clear it; unscheduled scrims show **Set time**.
+During the repeated hour
+when daylight saving ends, the earlier occurrence is used; nonexistent spring
+times are rejected.
+
 ### Lineup and playtime
 
 - Click a player for their single main role or single open main-role slot.

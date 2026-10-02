@@ -70,6 +70,7 @@ initialized), and `session`. Session contains:
 | --- | --- |
 | title | Scrim name, possibly empty |
 | contact | Contact BattleTag, possibly empty |
+| scheduledAt | Optional canonical UTC ISO timestamp (e.g. `2026-10-03T00:00:00.000Z`). Omitted means unscheduled. New scrims default to 8 PM on today's Eastern calendar date. |
 | attendees | Unique { playerId, present, priority? } entries |
 | lineup | Object with Tank, HSDPS, FDPS, MS, FS keys |
 | draft | Upcoming { map, mode, ourBan, theirBan } |

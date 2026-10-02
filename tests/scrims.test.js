@@ -23,7 +23,7 @@ test('switching scrims preserves complete sessions and isolates playtime', () =>
   const original = structuredClone(currentSession(state));
   const originalId = state.activeScrimId;
   createScrim(state, 'second', '2026-09-29T12:00:00Z');
-  assert.deepEqual(currentSession(state), newSession());
+  assert.deepEqual(currentSession(state), newSession('2026-09-29T12:00:00Z'));
   assert.equal(gamesFor(state, 'Tank'), 0);
   currentSession(state).contact = 'Other#1234';
   state.players[0].name = 'Shared name';
@@ -41,7 +41,7 @@ test('switching scrims preserves complete sessions and isolates playtime', () =>
 test('copy setup resets attendance, contact, games, and lineup without sharing mutable pools', () => {
   const state = populatedState();
   createScrim(state, 'second', '2026-09-29T12:00:00Z', true);
-  assert.deepEqual(currentSession(state), { ...newSession(), disabledMapIds: ['ilios'], attendees: ROLES.map(role => ({ playerId: role, present: false })) });
+  assert.deepEqual(currentSession(state), { ...newSession('2026-09-29T12:00:00Z'), disabledMapIds: ['ilios'], attendees: ROLES.map(role => ({ playerId: role, present: false })) });
   currentSession(state).disabledMapIds.push('oasis');
   currentSession(state).attendees[0].present = true;
   assert.deepEqual(state.scrims[0].session.disabledMapIds, ['ilios']);
