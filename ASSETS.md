@@ -29,6 +29,7 @@ licenses. OverFast's software license does not relicense Blizzard artwork.
 - Map names, mode mappings, and screenshots: [OverFast maps endpoint](https://overfast-api.tekrop.fr/maps).
 - Hero names, roles, and portrait URLs: [OverFast heroes endpoint](https://overfast-api.tekrop.fr/heroes). The portraits are Blizzard artwork served through the URLs supplied by the API.
 - Neon Junction image: [OverFast's repository copy](https://github.com/TeKrop/overfast-api/blob/main/static/maps/neon-junction.jpg), retrieved on 2026-09-28 because the API's image URL returned 404.
+- Watchpoint: Grímsvötn added on 2026-10-08, with its Escort mode from OverFast and [screenshot from OverFast's repository](https://github.com/TeKrop/overfast-api/blob/main/static/maps/watchpoint-grimsvotn.jpg) because the API's image URL returned 404. Name and release confirmed by [Blizzard's Season 5 announcement](https://overwatch.blizzard.com/en-us/news/24303008/).
 - [OverFast project](https://github.com/TeKrop/overfast-api) and [official Overwatch hero gallery](https://overwatch.blizzard.com/en-us/heroes/).
 
 Only the five scrim modes (Control, Push, Hybrid, Escort, Flashpoint) are included. Stadium-only locations are omitted. Map and hero artwork belongs to Blizzard Entertainment; this is an unofficial fan tool, not an official Blizzard product. No OverFast application code is incorporated.

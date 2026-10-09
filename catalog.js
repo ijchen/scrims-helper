@@ -231,6 +231,16 @@ export const MAPS = [
       "gib",
       "gibraltar"
     ]
+  },
+  {
+    "id": "watchpoint-grimsvotn",
+    "name": "Watchpoint: Grímsvötn",
+    "mode": "Escort",
+    "image": "assets/maps/watchpoint-grimsvotn.jpg",
+    "aliases": [
+      "grim",
+      "grimsvotn"
+    ]
   }
 ];
 
