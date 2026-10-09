@@ -309,6 +309,13 @@ export const HEROES = [
     "aliases": []
   },
   {
+    "id": "doctrine",
+    "name": "Doctrine",
+    "role": "support",
+    "image": "assets/heroes/doctrine.png",
+    "aliases": []
+  },
+  {
     "id": "domina",
     "name": "Domina",
     "role": "tank",
@@ -555,7 +562,7 @@ export const HEROES = [
   {
     "id": "sombra",
     "name": "Sombra",
-    "role": "dps",
+    "role": "support",
     "image": "assets/heroes/sombra.png",
     "aliases": []
   },

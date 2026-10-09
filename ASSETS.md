@@ -28,6 +28,7 @@ licenses. OverFast's software license does not relicense Blizzard artwork.
 
 - Map names, mode mappings, and screenshots: [OverFast maps endpoint](https://overfast-api.tekrop.fr/maps).
 - Hero names, roles, and portrait URLs: [OverFast heroes endpoint](https://overfast-api.tekrop.fr/heroes). The portraits are Blizzard artwork served through the URLs supplied by the API.
+- Hero roster checked against OverFast on 2026-10-08: added Doctrine and his portrait, and changed Sombra's role to Support. Confirmed against Blizzard's [Doctrine profile](https://overwatch.blizzard.com/en-us/heroes/doctrine/) and [Season 5 announcement](https://overwatch.blizzard.com/en-us/news/24303008/).
 - Neon Junction image: [OverFast's repository copy](https://github.com/TeKrop/overfast-api/blob/main/static/maps/neon-junction.jpg), retrieved on 2026-09-28 because the API's image URL returned 404.
 - Watchpoint: Grímsvötn added on 2026-10-08, with its Escort mode from OverFast and [screenshot from OverFast's repository](https://github.com/TeKrop/overfast-api/blob/main/static/maps/watchpoint-grimsvotn.jpg) because the API's image URL returned 404. Name and release confirmed by [Blizzard's Season 5 announcement](https://overwatch.blizzard.com/en-us/news/24303008/).
 - [OverFast project](https://github.com/TeKrop/overfast-api) and [official Overwatch hero gallery](https://overwatch.blizzard.com/en-us/heroes/).
