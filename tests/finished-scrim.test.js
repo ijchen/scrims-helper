@@ -22,7 +22,7 @@ test('an active game must finish first; reopening a game resumes the scrim', () 
   const session = currentSession(state);
   for (const role of ROLES) {
     state.players.push({ id: role, name: role, battletag: '', roles: [role], status: 'default', notes: '' });
-    session.attendees.push({ playerId: role, present: true });
+    session.attendees.push({ playerId: role, present: true, priority: '1' });
     session.lineup[role] = role;
   }
   startGame(state, 'game', '2026-09-30T12:00:00Z');

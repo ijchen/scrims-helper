@@ -1,7 +1,10 @@
 # Scrims Helper data format — v1
 
-V1 is the supported public format. Future incompatible changes require explicit
-versioning and a supported upgrade path for public v1 data.
+This is the format being finalized before the first public release. Earlier
+prerelease browser saves and exports may also say version 1 but use a different
+shape; they are intentionally unsupported. The app validates this single format
+strictly and does not migrate or repair older records. Rejected saved data is left
+untouched. After public release, versioned formats will retain backward support.
 
 ## Browser storage
 
@@ -12,6 +15,8 @@ All application data is JSON in localStorage under `scrims-helper.state`:
   "format": "scrims-helper-state",
   "version": 1,
   "players": [],
+  "statuses": [],
+  "statusOrder": ["default"],
   "scrims": [],
   "activeScrimId": "...",
   "mapPoolPresets": [],
@@ -50,7 +55,7 @@ Each player has:
 | battletag | BattleTag, or empty string |
 | roles | Main roles: unique subset of Tank, HSDPS, FDPS, MS, FS |
 | offRoles | Optional unique subset of those same slots, disjoint from roles; omitted means no declared fills |
-| status | default, trial, team, or ringer |
+| status | default, or an ID in the shared statuses list |
 | notes | Plain text, or empty string |
 
 An empty roles list is valid, including for fill-only players. offRoles is an
@@ -71,7 +76,7 @@ initialized), and `session`. Session contains:
 | title | Scrim name, possibly empty |
 | contact | Contact BattleTag, possibly empty |
 | scheduledAt | Optional canonical UTC ISO timestamp (e.g. `2026-10-03T00:00:00.000Z`). Omitted means unscheduled. New scrims default to 8 PM on today's Eastern calendar date. |
-| attendees | Unique { playerId, present, priority? } entries |
+| attendees | Unique { playerId, present, priority } entries |
 | lineup | Object with Tank, HSDPS, FDPS, MS, FS keys |
 | draft | Upcoming { map, mode, ourBan, theirBan } |
 | activeGame | Game record, or null |
@@ -80,12 +85,14 @@ initialized), and `session`. Session contains:
 | finished | Optional boolean, default false. Hides upcoming games; cannot be true while a game is active. Resuming preserves the draft and history. |
 | bansEnabled | Optional boolean; omitted means true. False hides bans and records new games without bans; existing records are preserved. |
 
-Attendees reference existing directory players. Optional priority is an explicit
-multiplier string: "1/5", "1/4", "1/3", "1/2", "2/3", "1", "3/2", "2", "3", "4", or "5".
-Omitted means neutral 1×; setting neutral removes the property. These values map
-to exact integer numerators and denominators, not floating-point approximations.
-It affects autofill only, never raw statistics. Transfers retain
-it; copied setups and removed/re-added attendees reset to neutral.
+Attendees reference existing directory players. Every new roster entry stores a
+priority multiplier string: "1/5", "1/4", "1/3", "1/2", "2/3", "1", "3/2", "2", "3", "4", or "5".
+It is initialized from the player's status default when added, then remains independent
+of directory changes. Resetting explicitly copies the current status default into
+that scrim. These values map to exact integer numerators and denominators.
+Priority affects autofill and roster sorting, never raw statistics. Transfers retain
+it; copied setups and removed/re-added attendees snapshot the current default.
+The field is required in every saved attendee and export; omitted values are rejected.
 Lineup values are attendee
 player IDs or empty strings for unfilled slots; players cannot appear twice.
 Absent and off-role assignments are allowed in the planned lineup.
@@ -127,6 +134,23 @@ empty if unspecified. Its saved value preserves the historical selection.
 
 ### Shared settings
 
+Required statusOrder is a complete ordered list of status IDs, including `default`
+exactly once. The definitions array does not determine display order.
+The Players tab sorts by this order, then alphabetically. Adding a status appends
+it to explicit order; deleting removes it. Default can move but cannot be edited
+or deleted.
+
+
+statuses is a required array of zero to 100 definitions:
+`{ id, name, color, priority, showBadge }`. Names are nonblank, at most 80
+characters, and unique after trimming and case-folding. IDs are unique; both the
+ID `default` and name `Default` (case-insensitive) are reserved. Colors are six-digit
+hex strings (`#RRGGBB`). priority uses exactly the same multiplier strings as
+attendee overrides; showBadge is boolean. Default is implicit, fixed at 1× with
+no badge. New custom statuses start at 1×; initial Trial is 1.5×. Deleting a status
+reassigns its players to Default without clearing manual scrim overrides.
+
+
 Map pool presets are { id, name, mapIds }, with nonblank names unique after
 trimming and case-folding. mapIds contains unique enabled catalog IDs; unknown
 IDs are preserved. Applying a preset copies its selection into a scrim.
@@ -145,6 +169,8 @@ customGameCode is shared across scrims; blank/whitespace uses the app default
   "schema": "scrims-helper-v1",
   "data": {
     "players": [],
+    "statuses": [],
+  "statusOrder": ["default"],
     "mapPoolPresets": [],
     "customGameCode": ""
   }
@@ -156,7 +182,10 @@ The schema marker is required for all exports, including partial exports.
 data includes only selected categories, with at least one present:
 players, scrims, mapPoolPresets, customGameCode. Scrims are represented as
 `{ activeId, items }`, where items uses the same scrim records as browser
-storage. A scrim export must include players. Preferences are not categories.
+storage. A scrim export must include players. Status definitions are included
+with the player directory, along with required statusOrder, not selected as separate
+categories. Players, statuses, and statusOrder must appear together. Preferences
+are not categories.
 Raw browser-state objects are not accepted as export files.
 
 An omitted category means “not included,” never “clear this category.”
@@ -169,12 +198,18 @@ the current active scrim; replacement uses the imported activeId.
 Scrims cannot be imported while skipping players. Replacing players requires
 replacing scrims or explicitly clearing existing scrims, never retaining
 potentially dangling references. Conflicting preset names are rejected.
+Status definitions follow the directory’s Merge/Replace/Skip choice. Merging
+updates matching status IDs and keeps unrelated definitions. Imported order comes
+first, followed by local-only statuses in their existing order. Definitions are retained when the
+incoming list is empty. Replacing uses the incoming list, which may be empty.
+Conflicting status names are rejected with instructions to rename or replace.
+Directory imports preserve retained scrim priorities; the preview explains this.
 The complete proposed state is validated before any write.
 
 ## Validation and failure behavior
 
 The executable contract is in schema.js and backups.js. Current limits:
-1,000 players/attendees; 100 scrims/presets; 10,000 completed games per scrim;
+1,000 players/attendees; 100 scrims/presets/statuses; 10,000 completed games per scrim;
 1,000 map IDs per list. Strings are bounded to 100 characters unless noted:
 player/preset names 80, notes 500, custom code 20. File import is limited to
 10 MiB. Limits apply to the merged result as well as imported data.

@@ -1,3 +1,4 @@
+import { uiIcon } from './icons.js';
 import { allScrims, switchScrim, createScrim, deleteScrim } from './model.js';
 import { scrimTimeLabel } from './scrim-time.js';
 
@@ -12,7 +13,7 @@ export function createScrimsUI({ getState, save, changed, confirmAction, notify,
       const current = scrim.id === state.activeScrimId;
       const date = scrim.session.scheduledAt ? scrimTimeLabel(scrim.session.scheduledAt) : scrim.createdAt ? new Date(scrim.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date set';
       const record = ['win', 'loss', 'draw'].map(outcome => `<span class="scrim-record-${outcome}">${scrim.session.games.filter(game => game.outcome === outcome).length}${{ win: 'W', loss: 'L', draw: 'D' }[outcome]}</span>`).join(' ');
-      return `<div class="saved-scrim-row ${current ? 'current' : ''}"><button class="saved-scrim-choice" data-switch-scrim="${escapeHtml(scrim.id)}" ${current ? 'aria-current="true"' : ''}><strong>${escapeHtml(scrim.session.title || 'Untitled scrim')}${current ? ' · Current' : ''}</strong><span class="muted small">${date} · ${scrim.session.games.length} games${scrim.session.finished ? ' · Done' : scrim.session.activeGame ? ' · In progress' : ''}</span><span class="small">${record}</span></button><button class="quiet" data-manage-scrim="${escapeHtml(scrim.id)}" aria-label="Edit ${escapeHtml(scrim.session.title || 'untitled scrim')}">⋯</button></div>`;
+      return `<div class="saved-scrim-row ${current ? 'current' : ''}"><button class="saved-scrim-choice" data-switch-scrim="${escapeHtml(scrim.id)}" ${current ? 'aria-current="true"' : ''}><strong>${escapeHtml(scrim.session.title || 'Untitled scrim')}${current ? ' · Current' : ''}</strong><span class="muted small">${date} · ${scrim.session.games.length} games${scrim.session.finished ? ' · Done' : scrim.session.activeGame ? ' · In progress' : ''}</span><span class="small">${record}</span></button><button class="quiet" data-manage-scrim="${escapeHtml(scrim.id)}" aria-label="Edit ${escapeHtml(scrim.session.title || 'untitled scrim')}">${uiIcon('more')}</button></div>`;
     }).join('');
   }
   function open() { render(); element('scrim-switcher').showModal(); }

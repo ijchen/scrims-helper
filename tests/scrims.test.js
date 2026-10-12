@@ -6,7 +6,7 @@ function populatedState() {
   const state = newState();
   for (const role of ROLES) {
     state.players.push({ id: role, name: role, battletag: `${role}#1234`, roles: [role], status: 'default', notes: '' });
-    currentSession(state).attendees.push({ playerId: role, present: true });
+    currentSession(state).attendees.push({ playerId: role, present: true, priority: '1' });
     currentSession(state).lineup[role] = role;
   }
   currentSession(state).title = 'First scrim';
@@ -41,7 +41,7 @@ test('switching scrims preserves complete sessions and isolates playtime', () =>
 test('copy setup resets attendance, contact, games, and lineup without sharing mutable pools', () => {
   const state = populatedState();
   createScrim(state, 'second', '2026-09-29T12:00:00Z', true);
-  assert.deepEqual(currentSession(state), { ...newSession('2026-09-29T12:00:00Z'), disabledMapIds: ['ilios'], attendees: ROLES.map(role => ({ playerId: role, present: false })) });
+  assert.deepEqual(currentSession(state), { ...newSession('2026-09-29T12:00:00Z'), disabledMapIds: ['ilios'], attendees: ROLES.map(role => ({ playerId: role, present: false, priority: '1' })) });
   currentSession(state).disabledMapIds.push('oasis');
   currentSession(state).attendees[0].present = true;
   assert.deepEqual(state.scrims[0].session.disabledMapIds, ['ilios']);

@@ -28,7 +28,7 @@ test('disabled bans do not enter new games or warnings and do not erase history'
   const session = currentSession(state);
   for (const role of ROLES) {
     state.players.push({ id: role, name: role, roles: [role], battletag: '', status: 'default', notes: '' });
-    session.attendees.push({ playerId: role, present: true });
+    session.attendees.push({ playerId: role, present: true, priority: '1' });
     session.lineup[role] = role;
   }
   session.draft.ourBan = heroRef('Ana');

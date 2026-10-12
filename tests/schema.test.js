@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newState, currentSession, ROLES, startGame, finishGame, validateState } from '../model.js';
+import { newState, currentSession, ROLES, startGame, finishGame, validateState, newAttendee } from '../model.js';
 import { exportData, readImport, planImport } from '../backups.js';
 import { mapRef, heroRef } from './fixtures.js';
 
@@ -22,7 +22,7 @@ test('v1 round trip preserves snapshots, custom names, unknown IDs and all share
   for (const role of ROLES) {
     const id = crypto.randomUUID();
     state.players.push({ id, name: role, battletag: role + '#123', roles: [role], status: 'ringer', notes: 'Notes' });
-    session.attendees.push({ playerId: id, present: true });
+    session.attendees.push(newAttendee(state, id, true));
     session.lineup[role] = id;
   }
   session.draft = { map: mapRef('Ilios'), mode: 'Control', ourBan: heroRef('Ana'), theirBan: { id: '', name: 'Custom hero' } };

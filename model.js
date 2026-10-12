@@ -1,7 +1,8 @@
 import { MAPS, HEROES } from './catalog.js';
 import { normalizeSearch } from './search.js';
 import { defaultScrimTime } from './scrim-time.js';
-import { ROLES, MODES, OUTCOMES, STATE_VERSION, PRIORITIES } from './schema.js';
+import { ROLES, MODES, OUTCOMES, STATE_VERSION, PRIORITIES, INITIAL_STATUSES } from './schema.js';
+import { effectivePriority, statusFor } from './statuses.js';
 import { catalogItem, referenceName, gameDetails } from './catalog-references.js';
 export { ROLES, MODES, OUTCOMES, STATE_VERSION, PRIORITIES, validateState } from './schema.js';
 
@@ -101,7 +102,7 @@ export function enabledMaps(session) {
 
 export function newState() {
   const id = crypto.randomUUID();
-  return { format: 'scrims-helper-state', version: STATE_VERSION, players: [], mapPoolPresets: [], customGameCode: '', activeScrimId: id, scrims: [{ id, createdAt: '', session: newSession() }] };
+  return { format: 'scrims-helper-state', version: STATE_VERSION, players: [], statuses: structuredClone(INITIAL_STATUSES), statusOrder: [...INITIAL_STATUSES.map(status => status.id), 'default'], mapPoolPresets: [], customGameCode: '', activeScrimId: id, scrims: [{ id, createdAt: '', session: newSession() }] };
 }
 
 export function allScrims(state) {
@@ -126,7 +127,7 @@ export function createScrim(state, id, createdAt, copySetup = false) {
   if (state.scrims.length >= 100) throw new Error('You can save up to 100 scrims. Export a backup before deleting older scrims.');
   const session = newSession(createdAt || new Date());
   if (copySetup) {
-    session.attendees = currentSession(state).attendees.map(attendee => ({ playerId: attendee.playerId, present: false }));
+    session.attendees = currentSession(state).attendees.map(attendee => newAttendee(state, attendee.playerId));
     session.disabledMapIds = [...currentSession(state).disabledMapIds];
     session.bansEnabled = currentSession(state).bansEnabled !== false;
   }
@@ -191,6 +192,26 @@ export function preferredGamesFor(state, playerId, includeActive = true) {
   return [...session.games, ...(includeActive && session.activeGame ? [session.activeGame] : [])].filter(game => game.lineup.some(slot => slot.playerId === playerId && roles.includes(slot.role))).length;
 }
 
+export function sortedAttendees(state) {
+  const players = new Map(state.players.map(player => [player.id, player]));
+  const ranks = new Map(currentSession(state).attendees.map(attendee => [attendee.playerId, {
+    games: preferredGamesFor(state, attendee.playerId),
+    priority: effectivePriority(state, attendee),
+  }]));
+  return [...currentSession(state).attendees].sort((first, second) => {
+    const attendance = Number(second.present) - Number(first.present);
+    if (attendance) return attendance;
+    const a = ranks.get(first.playerId);
+    const b = ranks.get(second.playerId);
+    // Compare priority / (main-role games + 1) exactly, without considering
+    // selected lineup slots or introducing floating-point tie differences.
+    const left = BigInt(a.priority.numerator) * BigInt(b.priority.denominator) * BigInt(b.games + 1);
+    const right = BigInt(b.priority.numerator) * BigInt(a.priority.denominator) * BigInt(a.games + 1);
+    return (left > right ? -1 : left < right ? 1 : 0) || a.games - b.games ||
+      players.get(first.playerId).name.localeCompare(players.get(second.playerId).name);
+  });
+}
+
 function randomBelow(limit) {
   if (limit === 1n) return 0n;
   const bits = limit.toString(2).length;
@@ -234,12 +255,17 @@ export function autofillUnavailableReason(state) {
   } catch (error) { return error.message; }
 }
 
+export function newAttendee(state, playerId, present = false) {
+  const player = state.players.find(player => player.id === playerId);
+  if (!player) throw new Error('Player not found.');
+  return { playerId, present, priority: statusFor(state, player).priority };
+}
+
 export function setPlayerPriority(state, playerId, value) {
-  if (!PRIORITIES.some(priority => priority.value === value)) throw new Error('Choose a supported priority.');
+  if (value !== null && !PRIORITIES.some(priority => priority.value === value)) throw new Error('Choose a supported priority.');
   const attendee = currentSession(state).attendees.find(entry => entry.playerId === playerId);
   if (!attendee) throw new Error('Player is not in this scrim.');
-  if (value === '1') delete attendee.priority;
-  else attendee.priority = value;
+  attendee.priority = value ?? newAttendee(state, playerId).priority;
 }
 
 export function autofillLineup(state, chooseRandom = randomBelow) {
@@ -260,25 +286,27 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
     while (second) [first, second] = [second, first % second];
     return first;
   };
-  const priorities = new Map(currentSession(state).attendees.map(attendee => [attendee.playerId, PRIORITIES.find(priority => priority.value === (attendee.priority ?? '1'))]));
+  const priorities = new Map(currentSession(state).attendees.map(attendee => [attendee.playerId, effectivePriority(state, attendee)]));
   const denominator = candidates.reduce((multiple, player) => {
     const divisor = BigInt(counts.get(player.id).total + 1) * BigInt(priorities.get(player.id).denominator);
     return multiple / gcd(multiple, divisor) * divisor;
   }, 1n);
-  const balanceGain = (values, index) => (12 * values.reduce((sum, count) => sum + count, 0) + 6) / values.length - 12 * values[index] - 6;
+  // Six scales averages over 1–3 groups (or 1–2 subroles) to exact integers.
+  // Balanced histories are neutral, regardless of how many main roles a player has.
+  const roleDeficit = (values, index) => 6 * values.reduce((sum, count) => sum + count, 0) / values.length - 6 * values[index];
   const scores = new Map(candidates.map(player => {
     const count = counts.get(player.id);
     const groups = [...new Set(player.roles.map(roleGroup))];
     const groupCounts = groups.map(group => ROLES.filter(role => roleGroup(role) === group).reduce((sum, role) => sum + count.roles[role], 0));
     return [player.id, emptyRoles.map(role => {
       if (!playableRoles(player).includes(role)) return null;
-      if (!player.roles.includes(role)) return [0n, 0n, 0, 0, -(count.fills + 1), 0];
+      if (!player.roles.includes(role)) return [0n, 0n, 0, -(count.fills + 1), 0];
       const group = roleGroup(role);
       const subroles = ROLES.filter(subrole => roleGroup(subrole) === group && player.roles.includes(subrole));
       const priority = priorities.get(player.id);
       const unweighted = denominator / BigInt(count.total + 1);
       const weighted = denominator * BigInt(priority.numerator) / (BigInt(count.total + 1) * BigInt(priority.denominator));
-      return [weighted, unweighted, Number(player.status === 'trial'), balanceGain(groupCounts, groups.indexOf(group)), 0, balanceGain(subroles.map(subrole => count.roles[subrole]), subroles.indexOf(role))];
+      return [weighted, unweighted, roleDeficit(groupCounts, groups.indexOf(group)), 0, roleDeficit(subroles.map(subrole => count.roles[subrole]), subroles.indexOf(role))];
     })];
   }));
   const compare = (first, second) => {
@@ -287,7 +315,7 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
     }
     return 0;
   };
-  let options = new Map([[0, { score: [0n, 0n, 0, 0, 0, 0], ways: 1n, lineup }]]);
+  let options = new Map([[0, { score: [0n, 0n, 0, 0, 0], ways: 1n, lineup }]]);
   for (const player of candidates) {
     const next = new Map(options);
     for (const [mask, option] of options) {

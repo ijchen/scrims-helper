@@ -12,7 +12,7 @@ test('selective exports retain only selected categories and enforce player depen
   assert.throws(() => exportData(state, {}, {}));
   assert.throws(() => exportData(state, { scrims: true }, {}));
   assert.deepEqual(roundtrip(state, { customGameCode: true }), { customGameCode: '' });
-  assert.deepEqual(roundtrip(state, { players: true }), { players: [] });
+  assert.deepEqual(roundtrip(state, { players: true }), { players: [], statuses: state.statuses, statusOrder: state.statusOrder });
   const data = roundtrip(state, { players: true, scrims: true });
   assert.deepEqual(data.scrims.items, allScrims(state));
   assert.notEqual(newState().activeScrimId, state.activeScrimId);
@@ -38,7 +38,7 @@ test('merge updates UUID matches, retains unrelated entries and does not mutate 
 test('player replacement requires replacing or explicitly clearing scrims', () => {
   const current = newState();
   current.players = [player('local')];
-  currentSession(current).attendees = [{ playerId: 'local', present: true }];
+  currentSession(current).attendees = [{ playerId: 'local', present: true, priority: '1' }];
   const incoming = newState();
   incoming.players = [player('remote')];
   const data = roundtrip(incoming, { players: true, scrims: true });
@@ -67,7 +67,7 @@ test('malformed partial files, dangling references, preferences and duplicate ID
   const wrap = data => ({ format: 'scrims-helper-export', version: 1, schema: 'scrims-helper-v1', data });
   for (const data of [{ players: null }, { preferences: { theme: 'neon' } }, { preferences: { panelSplit: 99 } }, { customGameCode: null }, { surprise: true }, {}]) assert.throws(() => readImport(wrap(data)));
   const state = newState();
-  currentSession(state).attendees = [{ playerId: 'missing', present: true }];
+  currentSession(state).attendees = [{ playerId: 'missing', present: true, priority: '1' }];
   assert.throws(() => roundtrip(state, { players: true, scrims: true }));
   assert.throws(() => readImport(wrap({ scrims: { activeId: 'missing', items: [] } })));
   assert.throws(() => readImport(wrap({ players: [player('same'), player('same')] })));
@@ -86,7 +86,7 @@ test('autofill availability agrees with feasibility, including shared-role bottl
   assert.ok(autofillUnavailableReason(state));
   for (const role of ROLES) {
     state.players.push({ ...player(role), roles: [role] });
-    currentSession(state).attendees.push({ playerId: role, present: true });
+    currentSession(state).attendees.push({ playerId: role, present: true, priority: '1' });
   }
   assert.equal(autofillUnavailableReason(state), '');
   state.players[4].roles = ['Tank'];

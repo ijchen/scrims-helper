@@ -13,6 +13,23 @@ export const PRIORITIES = [
 ];
 
 export const STATE_VERSION = 1;
+export const INITIAL_STATUSES = [
+  { id: 'team', name: 'Team Member', color: '#52805b', priority: '1', showBadge: true },
+  { id: 'trial', name: 'Trial', color: '#b7791f', priority: '3/2', showBadge: true },
+  { id: 'ringer', name: 'Ringer', color: '#bb438d', priority: '1', showBadge: true },
+];
+
+export function validateStatus(status) {
+  if (!status || typeof status !== 'object' || Array.isArray(status) || Object.keys(status).length !== 5 ||
+      !['id', 'name', 'color', 'priority', 'showBadge'].every(key => Object.hasOwn(status, key)) ||
+      typeof status.id !== 'string' || !status.id || status.id.length > 100 || status.id === 'default' ||
+      typeof status.name !== 'string' || !status.name.trim() || status.name.length > 80 || status.name.trim().toLowerCase() === 'default' ||
+      typeof status.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(status.color) ||
+      !PRIORITIES.some(option => option.value === status.priority) || typeof status.showBadge !== 'boolean') {
+    throw new Error('Use a unique status name, a color, and a supported priority.');
+  }
+}
+
 export const ROLES = ['Tank', 'HSDPS', 'FDPS', 'MS', 'FS'];
 export const MODES = ['Control', 'Push', 'Hybrid', 'Escort', 'Flashpoint'];
 export const OUTCOMES = ['win', 'loss', 'draw'];
@@ -29,9 +46,15 @@ export function validateState(input) {
   const ids = value => list(value, 1000) && value.every(identifier) && unique(value);
   const reference = value => value === null || (fields(value, ['id', 'name']) && string(value.id) && string(value.name) && Boolean(value.name.trim()));
   const details = value => object(value) && reference(value.map) && reference(value.ourBan) && reference(value.theirBan) && (value.mode === '' || MODES.includes(value.mode));
-  if (!fields(input, ['format', 'version', 'players', 'mapPoolPresets', 'customGameCode', 'activeScrimId', 'scrims']) || input.format !== 'scrims-helper-state' || input.version !== STATE_VERSION || !list(input.players, 1000) || !list(input.scrims, 100) || !input.scrims.length || !identifier(input.activeScrimId) || !string(input.customGameCode, 20) || !list(input.mapPoolPresets, 100)) fail();
+  if (!fields(input, ['format', 'version', 'players', 'mapPoolPresets', 'customGameCode', 'activeScrimId', 'scrims', 'statuses', 'statusOrder']) || input.format !== 'scrims-helper-state' || input.version !== STATE_VERSION || !list(input.players, 1000) || !list(input.scrims, 100) || !input.scrims.length || !identifier(input.activeScrimId) || !string(input.customGameCode, 20) || !list(input.mapPoolPresets, 100)) fail();
+  const statuses = input.statuses;
+  if (!list(statuses, 100)) fail();
+  for (const status of statuses) { try { validateStatus(status); } catch { fail(); } }
+  if (!unique(statuses.map(status => status.id)) || !unique(statuses.map(status => status.name.trim().toLowerCase()))) fail();
+  const statusIds = new Set(['default', ...statuses.map(status => status.id)]);
+  if (!list(input.statusOrder, 101) || !unique(input.statusOrder) || input.statusOrder.length !== statusIds.size || !input.statusOrder.every(id => statusIds.has(id))) fail();
   for (const player of input.players) {
-    if (!fields(player, ['id', 'name', 'battletag', 'roles', 'status', 'notes', ...(Object.hasOwn(player || {}, 'offRoles') ? ['offRoles'] : [])]) || !identifier(player.id) || !string(player.name, 80) || !player.name.trim() || !string(player.battletag) || !string(player.notes, 500) || !list(player.roles, 5) || !unique(player.roles) || !player.roles.every(role => ROLES.includes(role)) || !['default', 'trial', 'team', 'ringer'].includes(player.status)) fail();
+    if (!fields(player, ['id', 'name', 'battletag', 'roles', 'status', 'notes', ...(Object.hasOwn(player || {}, 'offRoles') ? ['offRoles'] : [])]) || !identifier(player.id) || !string(player.name, 80) || !player.name.trim() || !string(player.battletag) || !string(player.notes, 500) || !list(player.roles, 5) || !unique(player.roles) || !player.roles.every(role => ROLES.includes(role)) || !statusIds.has(player.status)) fail();
   }
   for (const player of input.players) {
     if (Object.hasOwn(player, 'offRoles') && (!list(player.offRoles, 5) || !unique(player.offRoles) || !player.offRoles.every(role => ROLES.includes(role) && !player.roles.includes(role)))) fail();
@@ -50,7 +73,7 @@ export function validateState(input) {
     if (Object.hasOwn(session, 'bansEnabled') && typeof session.bansEnabled !== 'boolean') fail();
     if (Object.hasOwn(session, 'finished') && (typeof session.finished !== 'boolean' || (session.finished && session.activeGame !== null))) fail();
     for (const attendee of session.attendees) {
-      if (!fields(attendee, ['playerId', 'present', ...(Object.hasOwn(attendee || {}, 'priority') ? ['priority'] : [])]) || !playerIds.has(attendee.playerId) || typeof attendee.present !== 'boolean' || (Object.hasOwn(attendee, 'priority') && !PRIORITIES.some(priority => priority.value === attendee.priority))) fail();
+      if (!fields(attendee, ['playerId', 'present', 'priority']) || !playerIds.has(attendee.playerId) || typeof attendee.present !== 'boolean' || !PRIORITIES.some(priority => priority.value === attendee.priority)) fail();
     }
     const attendeeIds = session.attendees.map(attendee => attendee.playerId);
     if (!unique(attendeeIds) || !fields(session.lineup, ROLES) || !ROLES.every(role => session.lineup[role] === '' || attendeeIds.includes(session.lineup[role])) || !unique(Object.values(session.lineup).filter(Boolean))) fail();

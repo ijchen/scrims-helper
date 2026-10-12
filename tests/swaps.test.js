@@ -7,7 +7,7 @@ function fixture() {
   for (let index = 0; index < 10; index += 1) {
     const id = `player-${index}`;
     state.players.push({ id, name: `Player ${index}`, battletag: `Tag${index}#1234`, roles: [...ROLES], status: 'default', notes: '' });
-    currentSession(state).attendees.push({ playerId: id, present: true });
+    currentSession(state).attendees.push({ playerId: id, present: true, priority: '1' });
     if (index < 5) currentSession(state).lineup[ROLES[index]] = id;
   }
   recordGame(state, 'previous', '2026-09-27T12:00:00Z');

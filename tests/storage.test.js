@@ -29,12 +29,12 @@ test('v1 state validates without writes, mutation, defaults or generated IDs', (
 });
 
 test('unsupported and corrupt saves stay untouched', () => {
-  for (const raw of ['broken', 'null', JSON.stringify({ version: 3 }), JSON.stringify({ ...newState(), version: 2 }), JSON.stringify({ ...newState(), players: null })]) {
+  for (const raw of ['broken', 'null', JSON.stringify({ version: 3 }), JSON.stringify({ ...newState(), version: 99 }), JSON.stringify({ ...newState(), players: null })]) {
     const storage = storageFor({ [STORAGE_KEY]: raw });
     assert.throws(() => restoreSavedState(readSavedState(storage)));
     assert.equal(storage.getItem(STORAGE_KEY), raw);
   }
-  assert.throws(() => restoreSavedState(JSON.stringify({ ...newState(), version: 2 })), { code: 'UNSUPPORTED_FORMAT' });
+  assert.throws(() => restoreSavedState(JSON.stringify({ ...newState(), version: 99 })), { code: 'UNSUPPORTED_FORMAT' });
 });
 
 test('exports require a supported envelope, including partial exports', () => {
@@ -42,10 +42,10 @@ test('exports require a supported envelope, including partial exports', () => {
   assert.equal(exported.format, 'scrims-helper-export');
   assert.equal(exported.version, 1);
   assert.equal(exported.schema, 'scrims-helper-v1');
-  assert.deepEqual(readImport(JSON.parse(JSON.stringify(exported))), { players: [] });
+  assert.deepEqual(readImport(JSON.parse(JSON.stringify(exported))), { players: [], statuses: newState().statuses, statusOrder: newState().statusOrder });
   for (const input of [
     { format: 'scrims-helper-export', version: 1, data: { players: [] } },
-    { ...exported, version: 2 }, { version: 1 }, newState(),
+    { ...exported, version: 99 }, { version: 1 }, newState(),
   ]) assert.throws(() => readImport(input), /unsupported format/);
 });
 

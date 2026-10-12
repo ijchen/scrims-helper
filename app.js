@@ -1,8 +1,11 @@
+import { uiIcon } from './icons.js';
 import { ROLES, STORAGE_KEY, emptyLineup, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, lineupSwaps, autofillLineup, startGame, finishGame, reopenLastGame, cancelActiveGame } from './model.js';
 import { gameDetails, referenceName } from './catalog-references.js';
 import { defaultScrimTime, easternInput, fromEasternInput, scrimTimeLabel, discordTimestamp } from './scrim-time.js';
 import { createGamesUI } from './games-ui.js';
-import { currentSession, currentScrim, gameCodeFor, allScrims, autofillUnavailableReason, playableRoles, preferredGamesFor, PRIORITIES, setPlayerPriority } from './model.js';
+import { currentSession, currentScrim, gameCodeFor, allScrims, autofillUnavailableReason, playableRoles, sortedAttendees, PRIORITIES, setPlayerPriority, newAttendee } from './model.js';
+import { statusFor, effectivePriority, orderedStatuses, sortedDirectoryPlayers } from './statuses.js';
+import { createStatusesUI } from './statuses-ui.js';
 import { createScrimsUI } from './scrims-ui.js';
 import { createBackupsUI } from './backups-ui.js';
 import { THEME_KEY, PANEL_SPLIT_KEY, BAR_LAYOUT_KEY, readSavedState, restoreSavedState, readPreference, isStateStorageKey, deleteSavedData } from './storage.js';
@@ -10,15 +13,18 @@ import { THEME_KEY, PANEL_SPLIT_KEY, BAR_LAYOUT_KEY, readSavedState, restoreSave
 const element = id => document.getElementById(id);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const roleNames = { Tank: 'Tank', HSDPS: 'Hitscan DPS', FDPS: 'Flex DPS', MS: 'Main support', FS: 'Flex support' };
-const statusNames = { default: 'Default', trial: 'Trial', team: 'Team member', ringer: 'Ringer' };
 const roleBadges = (player, choices = []) => playableRoles(player).map(role => choices.includes(role) ? `<button class="role-chip role-choice ${roleGroup(role)}" data-choice-role="${role}" data-choice-player="${escapeHtml(player.id)}" aria-label="Play ${escapeHtml(player.name)} as ${role}">${role}</button>` : `<span data-role-chip="${role}" class="role-chip ${roleGroup(role)} ${player.roles.includes(role) ? '' : 'fill-role'}" title="${roleNames[role]} · ${player.roles.includes(role) ? 'Main' : 'Fill'}">${role}${player.roles.includes(role) ? '' : '<span class="fill-mark"> · Fill</span>'}</span>`).join('');
-const statusBadge = player => player.status && player.status !== 'default' ? `<span class="status-badge ${player.status}">${statusNames[player.status]}</span>` : '';
+const statusBadge = player => {
+  const status = statusFor(state, player);
+  return status.showBadge ? `<span class="status-badge" style="--status-color:${status.color}">${escapeHtml(status.name)}</span>` : '';
+};
 const uid = () => crypto.randomUUID();
 let state = newState();
 let externalChange = false;
 const pendingRemovals = new Set();
 let closingRosterPicker = false;
 let addNewPlayerToScrim = true;
+let creatingRosterPlayerId = '';
 let notesPlayerId = '';
 let notesPreviewTarget = null;
 let shiftHeld = false;
@@ -72,7 +78,7 @@ try {
 function renderTheme() {
   document.documentElement.dataset.theme = darkTheme ? 'dark' : 'light';
   element('theme-toggle').setAttribute('aria-pressed', String(darkTheme));
-  element('theme-toggle').textContent = darkTheme ? '☾' : '☀';
+  element('theme-toggle').innerHTML = uiIcon(darkTheme ? 'moon' : 'sun', 22);
   const label = darkTheme ? 'Switch to light theme' : 'Switch to dark theme';
   element('theme-toggle').setAttribute('aria-label', label);
   element('theme-toggle').title = label;
@@ -205,18 +211,6 @@ function playerById(playerId) {
   return state.players.find(player => player.id === playerId);
 }
 
-function sortedAttendees() {
-  const counts = new Map(currentSession(state).attendees.map(attendee => [attendee.playerId, preferredGamesFor(state, attendee.playerId)]));
-  const completedCounts = new Map(currentSession(state).attendees.map(attendee => [attendee.playerId, preferredGamesFor(state, attendee.playerId, false)]));
-  return [...currentSession(state).attendees].sort((first, second) => {
-    const difference = counts.get(first.playerId) - counts.get(second.playerId);
-    const completedDifference = completedCounts.get(first.playerId) - completedCounts.get(second.playerId);
-    const firstPlayer = playerById(first.playerId);
-    const secondPlayer = playerById(second.playerId);
-    return Number(second.present) - Number(first.present) || difference || completedDifference || Number(secondPlayer.status === 'trial') - Number(firstPlayer.status === 'trial') || firstPlayer.name.localeCompare(secondPlayer.name);
-  });
-}
-
 function roleIcon(group) {
   const paths = {
     tank: '<path d="M12 3 20 6v6c0 5-8 9-8 9s-8-4-8-9V6Z"/>',
@@ -328,16 +322,16 @@ function playerCard(attendee) {
   const fills = player.offRoles || [];
   const unlisted = ROLES.filter(role => !playableRoles(player).includes(role));
   const choices = choosingPlayerId === player.id ? assignmentChoices(state, player.id) : [];
-  const priority = PRIORITIES.find(option => option.value === (attendee.priority ?? '1'));
+  const priority = effectivePriority(state, attendee);
   return `<article class="player-card roster-row ${roleGroup(assignedRole) || group} ${attendee.present ? '' : 'not-present'} ${assignedRole ? 'selected' : ''} ${offRole ? 'off-role' : ''} ${choices.length ? 'choosing' : ''}" data-player-card="${escapeHtml(player.id)}">
-    <div class="attendance-cell"><label class="attendance" title="${attendee.present ? 'Here' : 'Not here'}"><input type="checkbox" data-present="${escapeHtml(player.id)}" ${attendee.present ? 'checked' : ''} aria-label="${escapeHtml(player.name)} is present"><span aria-hidden="true">${attendee.present ? '✓' : '−'}</span></label>${assignedRole ? `<span class="lineup-badge ${roleGroup(assignedRole)} ${offRole ? 'unusual' : filling ? 'fill-assignment' : ''}" role="img" aria-label="Playing ${assignedRole}${offRole ? ' (unlisted)' : filling ? ' (fill)' : ''}" title="Playing ${assignedRole}${offRole ? ' (unlisted)' : filling ? ' (fill)' : ''}">${roleIcon(roleGroup(assignedRole))}${filling ? '<span class="fill-label">Fill</span>' : ''}${offRole ? '<span class="role-alert" aria-hidden="true">!</span>' : ''}</span>` : ''}</div>
+    <div class="attendance-cell"><label class="attendance" title="${attendee.present ? 'Here' : 'Not here'}"><input type="checkbox" data-present="${escapeHtml(player.id)}" ${attendee.present ? 'checked' : ''} aria-label="${escapeHtml(player.name)} is present"><span aria-hidden="true">${uiIcon(attendee.present ? 'check' : 'minus')}</span></label>${assignedRole ? `<span class="lineup-badge ${roleGroup(assignedRole)} ${offRole ? 'unusual' : filling ? 'fill-assignment' : ''}" role="img" aria-label="Playing ${assignedRole}${offRole ? ' (unlisted)' : filling ? ' (fill)' : ''}" title="Playing ${assignedRole}${offRole ? ' (unlisted)' : filling ? ' (fill)' : ''}">${roleIcon(roleGroup(assignedRole))}${filling ? '<span class="fill-label">Fill</span>' : ''}${offRole ? `<span class="role-alert" aria-hidden="true">${uiIcon('alert', 10)}</span>` : ''}</span>` : ''}</div>
     <div class="player-info" draggable="true" data-pick-player="${escapeHtml(player.id)}" title="${escapeHtml(player.battletag)}">
-      <div class="player-name-line"><button class="player-name-action" data-quick-assign="${escapeHtml(player.id)}" aria-label="Put ${escapeHtml(player.name)} in the lineup"><span class="card-name">${escapeHtml(player.name)} ${statusBadge(player)}${attendee.present ? '' : '<span class="away-badge">Not here</span>'}</span></button>${playerNotesButton(player)}<button class="player-priority ${priority.value !== '1' ? 'adjusted' : ''}" data-priority="${escapeHtml(player.id)}" title="Autofill priority: ${priority.label}" aria-label="Autofill priority for ${escapeHtml(player.name)}: ${priority.label}"> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h7m4 0h5M4 17h2m4 0h10"/><circle cx="13" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>${priority.value !== '1' ? `<span>${priority.label}</span>` : ''}</button></div>
+      <div class="player-name-line"><button class="player-name-action" data-quick-assign="${escapeHtml(player.id)}" aria-label="Put ${escapeHtml(player.name)} in the lineup"><span class="card-name">${escapeHtml(player.name)} ${statusBadge(player)}${attendee.present ? '' : '<span class="away-badge">Not here</span>'}</span></button>${playerNotesButton(player)}<button class="player-priority ${priority.value !== statusFor(state, player).priority ? 'adjusted' : ''}" data-priority="${escapeHtml(player.id)}" title="Autofill priority: ${priority.label} · Saved for this scrim" aria-label="Autofill priority for ${escapeHtml(player.name)}: ${priority.label}"> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h7m4 0h5M4 17h2m4 0h10"/><circle cx="13" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>${priority.label}</span></button></div>
       <span class="card-roles">${roleBadges(player, choices) || '<span class="muted small">No roles set</span>'}</span>
     </div>
     <label class="assignment-control"><span>Playing as</span><select data-assignment="${escapeHtml(player.id)}" aria-label="Playing as for ${escapeHtml(player.name)}"><option value="" ${!assignedRole ? 'selected' : ''}>Bench</option>${usual.length ? `<optgroup label="Main roles">${usual.map(option).join('')}</optgroup>` : ''}${fills.length ? `<optgroup label="Fill roles">${fills.map(option).join('')}</optgroup>` : ''}${unlisted.length ? `<optgroup label="Unlisted">${unlisted.map(option).join('')}</optgroup>` : ''}</select></label>
     <div class="playtime">${gameBar(player, 'total', 'total-games')}${barGroups.map(barGroup => gameBar(player, groupLabels[barGroup], `role-games ${barGroup}`, barGroup)).join('')}</div>
-    <div class="row-actions">${copyPlayerButton(player)}<button class="remove-player" data-remove="${escapeHtml(player.id)}" aria-label="Remove ${escapeHtml(player.name)} from scrim" title="${attendee.present ? 'Mark not present before removing from scrim' : 'Remove from scrim'}" ${attendee.present ? 'disabled' : ''}><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg></button><button class="edit-player" data-edit="${escapeHtml(player.id)}" title="Edit ${escapeHtml(player.name)}" aria-label="Edit ${escapeHtml(player.name)}">⋯</button></div>
+    <div class="row-actions">${copyPlayerButton(player)}<button class="remove-player" data-remove="${escapeHtml(player.id)}" aria-label="Remove ${escapeHtml(player.name)} from scrim" title="${attendee.present ? 'Mark not present before removing from scrim' : 'Remove from scrim'}" ${attendee.present ? 'disabled' : ''}><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg></button><button class="edit-player" data-edit="${escapeHtml(player.id)}" title="Edit ${escapeHtml(player.name)}" aria-label="Edit ${escapeHtml(player.name)}">${uiIcon('more')}</button></div>
   </article>`;
 }
 
@@ -345,7 +339,7 @@ function renderBoard() {
   const focused = document.activeElement;
   const focusKey = ['present', 'assignment', 'quickAssign', 'copyPlayer', 'emptyRole'].find(key => focused?.dataset[key]);
   const focusValue = focused?.dataset[focusKey];
-  const attendees = sortedAttendees();
+  const attendees = sortedAttendees(state);
   if (!attendees.some(attendee => attendee.playerId === choosingPlayerId)) choosingPlayerId = '';
   if (currentSession(state).lineup[choosingRole]) choosingRole = '';
   const choices = choosingPlayerId ? assignmentChoices(state, choosingPlayerId) : [];
@@ -363,9 +357,9 @@ function renderBoard() {
       <span class="slot-role">${roleIcon(roleGroup(role))}${role}</span><span class="slot-name">${escapeHtml(player?.name || 'Empty')}</span>${offRole ? '<span class="off-role-badge">Unlisted</span>' : filling ? '<span class="fill-slot-badge">Fill</span>' : ''}
     </button>`;
   }).join('')}</div>`).join('');
-  element('player-roster').innerHTML = attendees.map(playerCard).join('') + '<button class="add-player-row" data-open-directory><span aria-hidden="true">＋</span> Add player</button>';
+  element('player-roster').innerHTML = attendees.map(playerCard).join('') + `<button class="add-player-row" data-open-directory>${uiIcon('plus', 20)} Add player</button>`;
   const status = lineupStatus(state);
-  element('lineup-status').textContent = `${currentSession(state).activeGame ? 'Next lineup · ' : ''}${status.filled < 5 ? `${status.filled}/5 selected` : status.absent.length ? `${status.absent.length} not marked here` : '✓ Ready'}`;
+  element('lineup-status').innerHTML = `${currentSession(state).activeGame ? 'Next lineup · ' : ''}${status.filled < 5 ? `${status.filled}/5 selected` : status.absent.length ? `${status.absent.length} not marked here` : `${uiIcon('check')} Ready`}`;
   element('lineup-status').classList.toggle('ready', status.ready);
   element('clear-lineup').disabled = status.filled === 0;
   const autofillReason = autofillUnavailableReason(state);
@@ -436,13 +430,13 @@ function placePlayer(playerId, role, swap = false) {
   else if (role) assignPlayer(state, role, playerId, true);
   else if (previousRole) assignPlayer(state, previousRole, '');
   commit();
-  const message = role ? `${playerById(playerId).name} → ${role}${replaced && replaced.id !== playerId ? ` · ${replaced.name} → ${swap && previousRole ? previousRole : 'Bench'}` : ''}` : `${playerById(playerId).name} → Bench`;
+  const message = role ? `${playerById(playerId).name} to ${role}${replaced && replaced.id !== playerId ? ` · ${replaced.name} to ${swap && previousRole ? previousRole : 'Bench'}` : ''}` : `${playerById(playerId).name} to Bench`;
   notify(message, () => { currentSession(state).lineup = previous; commit(); });
 }
 
 function directoryPlayers(query) {
   const search = query.toLowerCase();
-  return [...state.players].sort((first, second) => first.name.localeCompare(second.name)).filter(player => `${player.name} ${player.battletag} ${playableRoles(player).join(' ')} ${player.notes || ''} ${statusNames[player.status] || ''}`.toLowerCase().includes(search));
+  return sortedDirectoryPlayers(state).filter(player => `${player.name} ${player.battletag} ${playableRoles(player).join(' ')} ${player.notes || ''} ${statusFor(state, player).name}`.toLowerCase().includes(search));
 }
 
 function renderDirectory() {
@@ -512,13 +506,14 @@ function closeDialog(id) {
 }
 
 function openPlayer(playerId = '', addToScrim = true) {
+  creatingRosterPlayerId = '';
   addNewPlayerToScrim = addToScrim;
   const player = playerById(playerId);
   element('player-form').reset();
   element('player-id').value = player?.id || '';
   element('player-name').value = player?.name || '';
   element('player-tag').value = player?.battletag || '';
-  element('player-status').value = player?.status || 'default';
+  renderPlayerStatuses(player?.status || 'default');
   element('player-notes').value = player?.notes || '';
   element('player-form-heading').textContent = player ? 'Edit player' : 'New player';
   element('delete-player').hidden = !player;
@@ -531,6 +526,16 @@ function openPlayer(playerId = '', addToScrim = true) {
   element('player-dialog').showModal();
   element('player-name').focus();
 }
+
+function renderPlayerStatuses(selected = element('player-status').value || 'default') {
+  element('player-status').innerHTML = orderedStatuses(state).map(status => `<option value="${escapeHtml(status.id)}">${escapeHtml(status.name)}</option>`).join('');
+  element('player-status').value = selected === 'default' || state.statuses.some(status => status.id === selected) ? selected : 'default';
+}
+
+const statusesUI = createStatusesUI({ getState: () => state, escapeHtml, confirmAction, onChange: () => {
+  renderPlayerStatuses();
+  commit();
+} });
 
 for (const dialog of document.querySelectorAll('dialog')) {
   if (dialog.id === 'storage-recovery-dialog') continue;
@@ -634,7 +639,7 @@ element('board').addEventListener('contextmenu', event => {
   const priorityButton = event.target.closest('[data-priority]');
   if (priorityButton) {
     event.preventDefault();
-    setPlayerPriority(state, priorityButton.dataset.priority, '1');
+    setPlayerPriority(state, priorityButton.dataset.priority, null);
     commit();
     return;
   }
@@ -739,7 +744,7 @@ document.addEventListener('change', async event => {
     const playerId = target.dataset.attendee;
     if (target.checked) {
       pendingRemovals.delete(playerId);
-      if (!currentSession(state).attendees.some(attendee => attendee.playerId === playerId)) currentSession(state).attendees.push({ playerId, present: false });
+      if (!currentSession(state).attendees.some(attendee => attendee.playerId === playerId)) currentSession(state).attendees.push(newAttendee(state, playerId));
     } else pendingRemovals.add(playerId);
     commit();
     Array.from(document.querySelectorAll('[data-attendee]')).find(input => input.dataset.attendee === playerId)?.focus();
@@ -764,7 +769,7 @@ element('manage-directory-search').addEventListener('input', renderManagedDirect
 element('manage-directory-button').onclick = () => {
   element('manage-directory-search').value = '';
   renderManagedDirectory();
-  element('manage-directory-dialog').showModal();
+  statusesUI.open();
   updateShiftShortcuts();
   element('manage-directory-search').focus();
 };
@@ -883,9 +888,9 @@ element('undo-game').onclick = () => {
   });
 };
 element('copy-contact').onclick = async () => {
-  if (!currentSession(state).contact.trim()) return notify('Add the opponent’s BattleTag first.');
-  try { await navigator.clipboard.writeText(currentSession(state).contact); notify('Opponent BattleTag copied.'); }
-  catch { element('contact').focus(); element('contact').select(); notify('Use Ctrl+C or ⌘C to copy the selected BattleTag.'); }
+  if (!currentSession(state).contact.trim()) return notify('Add a contact first.');
+  try { await navigator.clipboard.writeText(currentSession(state).contact); notify('Contact copied.'); }
+  catch { element('contact').focus(); element('contact').select(); notify('Use Ctrl+C or ⌘C to copy the selected contact.'); }
 };
 
 function updateRoleCycle(button) {
@@ -942,11 +947,12 @@ let priorityPlayerId = '';
 function syncPriorityControl() {
   const attendee = currentSession(state).attendees.find(entry => entry.playerId === priorityPlayerId);
   if (!attendee) return;
-  const priority = PRIORITIES.find(option => option.value === (attendee.priority ?? '1'));
+  const priority = effectivePriority(state, attendee);
   element('priority-slider').value = PRIORITIES.indexOf(priority);
   element('priority-slider').setAttribute('aria-valuetext', priority.label);
   element('priority-value').textContent = priority.label;
 }
+element('priority-slider').max = PRIORITIES.length - 1;
 element('priority-ticks').innerHTML = PRIORITIES.map((priority, index) => `<span style="left: ${index / (PRIORITIES.length - 1) * 100}%" class="${priority.value === '1' ? 'neutral' : ''}">${priority.label}</span>`).join('');
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-priority]');
@@ -975,10 +981,15 @@ function savePlayer() {
   }
   else {
     state.players.push(player);
-    if (addNewPlayerToScrim) currentSession(state).attendees.push({ playerId: player.id, present: false });
+    if (addNewPlayerToScrim) {
+      currentSession(state).attendees.push(newAttendee(state, player.id));
+      creatingRosterPlayerId = player.id;
+    }
     element('player-id').value = player.id;
     element('delete-player').hidden = false;
   }
+  // Autosave creates a new player before their initial status selection is done.
+  if (creatingRosterPlayerId === player.id) setPlayerPriority(state, player.id, null);
   commit();
 }
 element('player-form').addEventListener('input', savePlayer);

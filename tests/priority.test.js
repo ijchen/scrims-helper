@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newState, currentSession, ROLES, PRIORITIES, autofillLineup, setPlayerPriority, createScrim, removeAttendee, validateState } from '../model.js';
+import { newState, currentSession, ROLES, PRIORITIES, autofillLineup, setPlayerPriority, createScrim, removeAttendee, validateState, newAttendee } from '../model.js';
 import { exportData, readImport } from '../backups.js';
 
 function fixture() {
   const state = newState();
   for (const role of ROLES.slice(1)) {
     state.players.push({ id: role, name: role, roles: [role], status: 'default', notes: '', battletag: '' });
-    currentSession(state).attendees.push({ playerId: role, present: true });
+    currentSession(state).attendees.push({ playerId: role, present: true, priority: '1' });
     currentSession(state).lineup[role] = role;
   }
   return state;
@@ -15,7 +15,7 @@ function fixture() {
 
 function add(state, id, games, priority = '1', status = 'default') {
   state.players.push({ id, name: id, roles: ['Tank'], status, notes: '', battletag: '' });
-  currentSession(state).attendees.push({ playerId: id, present: true });
+  currentSession(state).attendees.push({ playerId: id, present: true, priority: '1' });
   setPlayerPriority(state, id, priority);
   for (let index = 0; index < games; index++) {
     currentSession(state).games[index] ??= { lineup: [] };
@@ -23,7 +23,7 @@ function add(state, id, games, priority = '1', status = 'default') {
   }
 }
 
-test('priority can favor more-played players; exact weighted ties use unweighted fairness before trials', () => {
+test('priority can favor more-played players; exact weighted ties use unweighted fairness regardless of status', () => {
   const state = fixture();
   add(state, 'boosted', 3, '2', 'trial');
   add(state, 'regular', 2);
@@ -81,7 +81,7 @@ test('priority stays per scrim, transfers, validates, and resets on copied setup
   const state = fixture();
   add(state, 'player', 0, '1/3');
   assert.equal(readImport(exportData(state, { players: true, scrims: true })).scrims.items[0].session.attendees.at(-1).priority, '1/3');
-  for (const invalid of [-5, 5, 0, .25, 1.5, '1.5', '2/2', '6', null, NaN]) {
+  for (const invalid of [-5, 5, 0, .25, 1.5, '1.5', '5/4', '2/2', '6', NaN]) {
     assert.throws(() => setPlayerPriority(state, 'player', invalid));
     const copy = structuredClone(state);
     currentSession(copy).attendees.at(-1).priority = invalid;
@@ -89,11 +89,11 @@ test('priority stays per scrim, transfers, validates, and resets on copied setup
   }
   assert.throws(() => setPlayerPriority(state, 'missing', '1'));
   removeAttendee(state, 'player');
-  currentSession(state).attendees.push({ playerId: 'player', present: true });
-  assert.equal(currentSession(state).attendees.at(-1).priority, undefined);
+  currentSession(state).attendees.push(newAttendee(state, 'player', true));
+  assert.equal(currentSession(state).attendees.at(-1).priority, '1');
   setPlayerPriority(state, 'player', '5');
   createScrim(state, 'new', '2026-09-30T12:00:00Z', true);
-  assert.ok(currentSession(state).attendees.every(attendee => attendee.priority === undefined));
+  assert.ok(currentSession(state).attendees.every(attendee => attendee.priority === '1'));
   assert.doesNotThrow(() => validateState(state));
 });
 
@@ -129,7 +129,7 @@ test('weighted optimizer agrees with independent exact rational enumeration', ()
       counts.set(id, games);
     }
     const score = lineup => Object.values(lineup).reduce((total, id) => {
-      const priority = PRIORITIES.find(option => option.value === (currentSession(state).attendees.find(attendee => attendee.playerId === id).priority ?? '1'));
+      const priority = PRIORITIES.find(option => option.value === currentSession(state).attendees.find(attendee => attendee.playerId === id).priority);
       return [addFraction(total[0], [BigInt(priority.numerator), BigInt(priority.denominator * (counts.get(id) + 1))]), addFraction(total[1], [1n, BigInt(counts.get(id) + 1)])];
     }, [[0n, 1n], [0n, 1n]]);
     let best = null;

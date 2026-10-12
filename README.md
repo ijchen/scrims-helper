@@ -44,9 +44,11 @@ times are rejected.
 - Drag onto another player to swap positions. Right-click a player or drag them
   outside the lineup and player rows to bench them. **Playing as** allows explicit
   assignments; **Clear lineup** benches everyone. Assignment changes offer **Undo**.
-- Rows sort by attendance, fewest preferred-role games including the active game,
-  then fewest completed preferred-role games, trial status, and name.
-  Fills do not count toward sorting. Bars still show actual games.
+- Rows sort present players first, then by highest `priority / (preferred games + 1)`,
+  using the priority saved in this scrim and including the active game.
+  Ties favor fewer preferred-role games, then alphabetical name. The selected lineup
+  does not affect this general priority order. Fills do not count toward sorting;
+  bars still show actual games.
 - Segmented bars are game-by-game timelines, oldest on the left, with gaps for
   games sat out. Solid segments are preferred-role games; muted outlines are
   fills, and stripes indicate the in-progress game. Hover a segment for its
@@ -78,17 +80,25 @@ hover the button for the reason.
 Complete options are ranked by:
 1. Weighted preferred-playtime fairness: maximize `priority / (preferred games + 1)` for each main-role assignment; fills contribute zero.
 2. Unweighted preferred-playtime fairness: maximize `1 / (preferred games + 1)`.
-3. Number of trials receiving main-role assignments.
-4. Reduction in squared imbalance across each player's main Tank / DPS / Support groups.
-5. Minimize the sum of `previous fills + 1` for each proposed fill.
-6. Reduction in squared imbalance between main subroles within DPS or Support.
-7. Uniform random choice among exactly tied assignments.
+3. Favor underplayed main Tank / DPS / Support groups: the player's average main games per group minus games in the proposed group.
+4. Minimize the sum of `previous fills + 1` for each proposed fill.
+5. Favor underplayed main subroles within DPS or Support, using the same average-minus-count score.
+6. Uniform random choice among exactly tied assignments.
+
+Balanced role histories score zero, including specialists and players with no games.
+Role balance rewards underplayed roles and penalizes overplayed roles; having more
+main roles does not itself incur a penalty.
 
 The priority control beside each player's name opens a snapped slider:
-⅕×, ¼×, ⅓×, ½×, ⅔×, 1×, 1.5×, 2×, 3×, 4×, 5×. It defaults to 1×, applies only to
-that scrim, and is included in scrim exports. New scrims (including reused
-rosters) and removed/re-added players start neutral. Non-neutral priorities
-appear as badges; right-click the control to reset to neutral. Row sorting and actual game counts are unchanged.
+⅕×, ¼×, ⅓×, ½×, ⅔×, 1×, 1.5×, 2×, 3×, 4×, 5×. These are also the options for
+status default priorities. Adding a player copies their status default into that scrim's
+roster entry. This saved priority remains unchanged if their status or its default
+changes later. You can adjust it independently for each scrim.
+Right-click the control to copy the player's current status default into this scrim.
+New scrims with reused rosters and removed/re-added players start with the current
+status default. Every saved priority travels with scrim exports. Priority affects
+autofill and roster sorting, but not actual counts. The fixed-width controls always
+show the multiplier and highlight values that differ from the current status default.
 Both fairness scores use exact BigInt common-denominator arithmetic, not
 floating-point approximations. Multiplying all priorities by the same factor
 preserves ranking and ties; role constraints may prevent proportional playtime.
@@ -112,9 +122,21 @@ Click a role button to cycle **Unlisted → Main → Fill → Unlisted**; change
 immediately. Main roles use filled
 badges; fills use outlined badges. Clicking a player offers only main roles;
 choose a slot first or drag to explicitly assign a fill. A player may have only
-fill roles. Existing role selections remain mains. Statuses are **Default**,
-**Trial**, **Team member**, and **Ringer**. Ringers have a magenta badge; only
-trials receive special sorting/autofill priority.
+fill roles. Existing role selections remain mains.
+
+The **Statuses** tab in the player directory lets you add, rename, recolor,
+and delete statuses, choose a default autofill priority, and toggle their badges.
+Edits save automatically; the priority slider uses the same scale as scrim overrides.
+Initial order is **Team Member** (1×), **Trial** (1.5×), **Ringer** (1×), then **Default** (1×).
+Drag the three-line handles to order statuses, including Default (or focus a
+handle and use the up/down arrow keys). The directory’s
+Players tab and Add players picker sort by that order, then alphabetically within each status.
+Status order travels with directory backups. New custom statuses start at 1×. **Default** is fixed at 1× with no badge and is
+shown with disabled Edit and delete controls; it cannot be edited or deleted. You can delete every custom status; players using
+a deleted status return to Default while keeping all saved scrim priorities.
+Status definitions are shared across scrims and travel with the player directory.
+Default priority edits apply to future roster additions; existing scrim priorities stay
+fixed. There is no separate trial tiebreaker in autofill or list sorting.
 
 **Add player** is the separate roster picker. Additions save immediately.
 Unchecking players queues removal; Done, Escape, the close button, or clicking
@@ -202,11 +224,13 @@ to **Replace**:
 
 Importing scrims requires importing players. Replacing players also requires
 replacing scrims or explicitly clearing them. Player updates affect retained
-scrims using those players. Conflicting preset names must be resolved before
-merging. The combined result is validated and saved together.
+scrims using those players. Status definitions follow the directory’s import
+choice. Conflicting preset or status names must be resolved before merging. The combined result is validated and saved together.
 
 Player and scrim UUIDs survive transfers; names are not used to match identities.
-V1 is the supported data format. An unsupported or unreadable save opens a blocking dialog
+V1 is the format being finalized before release. Earlier prerelease saves and backups
+with different shapes are intentionally unsupported, even if labeled V1.
+An unsupported or unreadable save opens a blocking dialog
 with **Start fresh** and **Import backup**. Nothing is cleared until you
 explicitly reset or apply a valid import. Start fresh clears this app's data
 and preferences on this browser; it does not affect other sites.
@@ -215,7 +239,7 @@ Another tab changing saved data pauses writes in the current tab: reload
 before continuing. **Delete all saved data** in settings requires typing
 `delete everything`.
 
-See [DATA_FORMAT.md](DATA_FORMAT.md) for the v1 storage and export contract.
+See [DATA_FORMAT.md](DATA_FORMAT.md) for the strict v1 storage and export contract.
 
 ## Development and deployment
 

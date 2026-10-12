@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { currentSession, autofillLineup, emptyLineup, newState, ROLES } from '../model.js';
+import { currentSession, autofillLineup, emptyLineup, newState, ROLES, newAttendee } from '../model.js';
 
 function add(state, id, roles, history = [], status = 'default', present = true) {
   state.players.push({ id, name: id, battletag: '', roles, status, notes: '' });
-  currentSession(state).attendees.push({ playerId: id, present });
+  currentSession(state).attendees.push(newAttendee(state, id, present));
   history.forEach((role, index) => {
     currentSession(state).games[index] ??= { id: `game-${index}`, lineup: [] };
     currentSession(state).games[index].lineup.push({ playerId: id, role });
@@ -116,7 +116,7 @@ test('diminishing returns prefer spreading playtime to multiple underplayed play
   assert.ok(Object.values(result).includes('newcomer'));
 });
 
-test('playtime wins over role balance and trial status; active games count', () => {
+test('unweighted fairness breaks a weighted tie before role balance; active games count', () => {
   const state = fixture(['FS']);
   add(state, 'less-played', ['FS'], ['FS']);
   add(state, 'trial', ['FS', 'FDPS'], ['FDPS', 'FDPS'], 'trial');
@@ -141,14 +141,14 @@ test('balances assignments of the same selected people', () => {
   assert.equal(result.HSDPS, 'blair');
 });
 
-test('trial preference outranks main-role balance', () => {
+test('inherited trial priority outranks main-role balance', () => {
   const state = fixture(['HSDPS']);
   add(state, 'flex-heavy', ['HSDPS', 'FDPS'], ['FDPS', 'FDPS', 'FDPS', 'HSDPS']);
   add(state, 'hitscan-heavy', ['HSDPS', 'FDPS'], ['HSDPS', 'HSDPS', 'HSDPS', 'FDPS'], 'trial');
   assert.equal(autofillLineup(state).HSDPS, 'hitscan-heavy');
 });
 
-test('trials beat default and team players only on otherwise tied scores', () => {
+test('trials inherit higher priority than default and team players', () => {
   const state = fixture(['Tank']);
   add(state, 'team', ['Tank'], [], 'team');
   add(state, 'default', ['Tank']);
@@ -162,6 +162,37 @@ test('randomizes only exact ties and can choose either tied player', () => {
   add(state, 'alphabet-last', ['Tank']);
   assert.equal(autofillLineup(state, () => 0n).Tank, 'alphabet-last');
   assert.equal(autofillLineup(state, limit => limit - 1n).Tank, 'alphabet-first');
+});
+
+test('new specialists and flex players tie regardless of main group or subrole count', () => {
+  for (const roles of [['MS', 'FS'], ['MS', 'FS', 'FDPS'], ['Tank', 'FDPS', 'MS', 'FS']]) {
+    const state = fixture(['MS']);
+    add(state, 'specialist', ['MS']);
+    add(state, 'flex', roles);
+    assert.equal(autofillLineup(state, () => 0n).MS, 'flex');
+    assert.equal(autofillLineup(state, limit => limit - 1n).MS, 'specialist');
+  }
+});
+
+test('balanced flex histories stay neutral against specialists with equal main playtime', () => {
+  const state = fixture(['MS']);
+  add(state, 'specialist', ['MS'], Array(4).fill('MS'));
+  add(state, 'flex', ['FDPS', 'MS', 'FS'], ['FDPS', 'FDPS', 'MS', 'FS']);
+  assert.equal(autofillLineup(state, () => 0n).MS, 'flex');
+  assert.equal(autofillLineup(state, limit => limit - 1n).MS, 'specialist');
+});
+
+test('underplayed groups and subroles beat neutral scores, and overplayed ones lose', () => {
+  for (const alternate of ['FDPS', 'FS']) {
+    for (const underplayed of [true, false]) {
+      const state = fixture(['MS']);
+      add(state, 'specialist', ['MS'], Array(4).fill('MS'));
+      add(state, 'flex', ['MS', alternate], underplayed ? [alternate, alternate, alternate, 'MS'] : ['MS', 'MS', 'MS', alternate]);
+      const expected = underplayed ? 'flex' : 'specialist';
+      assert.equal(autofillLineup(state, () => 0n).MS, expected);
+      assert.equal(autofillLineup(state, limit => limit - 1n).MS, expected);
+    }
+  }
 });
 
 test('handles a large flexible roster without enumerating full lineups', () => {
@@ -182,6 +213,20 @@ test('broad-role balance outranks a better subrole balance', () => {
   assert.equal(autofillLineup(state).HSDPS, 'needs-dps');
 });
 
+test('broad-role balance precedes fill cost, which precedes subrole balance', () => {
+  for (const alternate of ['FS', 'FDPS']) {
+    const state = fixture(['Tank', 'HSDPS']);
+    add(state, 'needs-hitscan', ['HSDPS', alternate], [alternate]);
+    state.players.at(-1).offRoles = ['Tank'];
+    add(state, 'repeat-filler', ['HSDPS', alternate], ['HSDPS', 'Tank', 'Tank', 'Tank']);
+    state.players.at(-1).offRoles = ['Tank'];
+    const result = autofillLineup(state);
+    // Broad-role variety justifies another fill; subrole variety does not.
+    assert.equal(result.HSDPS, alternate === 'FS' ? 'needs-hitscan' : 'repeat-filler');
+    assert.equal(result.Tank, alternate === 'FS' ? 'repeat-filler' : 'needs-hitscan');
+  }
+});
+
 test('global optimizer matches exhaustive scoring on varied small rosters', () => {
   let seed = 12345;
   const random = maximum => {
@@ -189,10 +234,6 @@ test('global optimizer matches exhaustive scoring on varied small rosters', () =
     return seed % maximum;
   };
   const group = role => role === 'Tank' ? 'tank' : role.endsWith('DPS') ? 'dps' : 'support';
-  const variance = values => {
-    const mean = values.reduce((sum, count) => sum + count, 0) / values.length;
-    return values.reduce((sum, count) => sum + (count - mean) ** 2, 0);
-  };
   const compare = (first, second) => {
     for (let index = 0; index < first.length; index += 1) {
       if (Math.abs(first[index] - second[index]) > 1e-8) return Math.sign(first[index] - second[index]);
@@ -214,11 +255,9 @@ test('global optimizer matches exhaustive scoring on varied small rosters', () =
       if (!player.roles.includes(role)) return [total[0], total[1], total[2], total[3] - (allHistory.length - history.length + 1), total[4]];
       const groups = [...new Set(player.roles.map(group))];
       const before = groups.map(category => history.filter(slot => group(slot.role) === category).length);
-      const after = before.map((count, index) => count + Number(groups[index] === group(role)));
       const subroles = player.roles.filter(subrole => group(subrole) === group(role));
       const subBefore = subroles.map(subrole => history.filter(slot => slot.role === subrole).length);
-      const subAfter = subBefore.map((count, index) => count + Number(subroles[index] === role));
-      return [total[0] + 1 / (history.length + 1), total[1] + Number(player.status === 'trial'), total[2] + variance(before) - variance(after), total[3], total[4] + variance(subBefore) - variance(subAfter)];
+      return [total[0] + (player.status === 'trial' ? 1.5 : 1) / (history.length + 1), total[1] + 1 / (history.length + 1), total[2] + (history.length / groups.length - before[groups.indexOf(group(role))]), total[3], total[4] + (subBefore.reduce((sum, count) => sum + count, 0) / subroles.length - subBefore[subroles.indexOf(role)])];
     }, [0, 0, 0, 0, 0]);
     let best = null;
     function enumerate(lineup, used, index) {

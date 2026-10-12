@@ -67,7 +67,7 @@ test('confirmed start marks only the chosen five present and does not credit gam
   const state = readyState();
   currentSession(state).attendees.forEach(attendee => { attendee.present = false; });
   state.players.push({ id: 'bench', name: 'Bench', battletag: '', roles: ['Tank'], status: 'default', notes: '' });
-  currentSession(state).attendees.push({ playerId: 'bench', present: false });
+  currentSession(state).attendees.push({ playerId: 'bench', present: false, priority: '1' });
   assert.throws(() => startGame(state, 'start', '2026-09-27T12:00:00Z'));
   startGame(state, 'start', '2026-09-27T12:00:00Z', true);
   assert.equal(currentSession(state).attendees.filter(attendee => attendee.present).length, 5);
@@ -163,7 +163,7 @@ function readyState() {
   for (const [index, role] of ROLES.entries()) {
     const player = { id: `player-${index}`, name: `Player ${index}`, battletag: `Player#${index}`, roles: [role], status: 'default', notes: '' };
     state.players.push(player);
-    currentSession(state).attendees.push({ playerId: player.id, present: true });
+    currentSession(state).attendees.push({ playerId: player.id, present: true, priority: '1' });
     assignPlayer(state, role, player.id);
   }
   return state;
@@ -195,7 +195,7 @@ test('quick assignment picks a single role or unique opening, otherwise offers c
   const state = readyState();
   const player = { id: 'flex', name: 'Flex', battletag: '', roles: ['MS'], status: 'default', notes: '' };
   state.players.push(player);
-  currentSession(state).attendees.push({ playerId: player.id, present: false });
+  currentSession(state).attendees.push({ playerId: player.id, present: false, priority: '1' });
   assert.deepEqual(assignmentChoices(state, player.id), ['MS']);
   player.roles = ['Tank', 'MS', 'FS'];
   assert.deepEqual(assignmentChoices(state, player.id), ['Tank', 'MS', 'FS']);
@@ -344,7 +344,7 @@ test('player statuses survive backups and missing statuses are rejected', () => 
 test('partially entered players survive backups without becoming eligible for a role', () => {
   const state = newState();
   state.players.push({ id: 'draft', name: 'Unnamed player', battletag: '', roles: [], status: 'trial', notes: '' });
-  currentSession(state).attendees.push({ playerId: 'draft', present: false });
+  currentSession(state).attendees.push({ playerId: 'draft', present: false, priority: '1' });
   const restored = validateState(state);
   assert.deepEqual(restored, state);
   assignPlayer(restored, 'Tank', 'draft');

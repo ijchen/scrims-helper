@@ -1,4 +1,5 @@
-import { STORAGE_KEY, STATE_VERSION, validateState } from './model.js';
+import { validateState } from './schema.js';
+import { STORAGE_KEY, STATE_VERSION } from './model.js';
 
 export const THEME_KEY = 'scrims-helper.theme';
 export const PANEL_SPLIT_KEY = 'scrims-helper.panelSplit';

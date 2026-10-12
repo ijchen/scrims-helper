@@ -1,3 +1,4 @@
+import { uiIcon } from './icons.js';
 import { MAPS, HEROES } from './catalog.js';
 import { findCatalogItem, searchCatalog } from './search.js';
 import { catalogItem, catalogReference, referenceName } from './catalog-references.js';
@@ -5,7 +6,7 @@ import { currentSession, setScrimFinished, ROLES, MODES, OUTCOMES, modeRotation,
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const element = id => document.getElementById(id);
-const warningText = warnings => warnings.length ? `<span class="conflict-note">⚠ ${warnings.join(' · ')}</span>` : '';
+const warningText = warnings => warnings.length ? `<span class="conflict-note">${uiIcon('warning', 13)} ${warnings.join(' · ')}</span>` : '';
 
 export const finishControls = () => `<div class="finish-controls" role="group" aria-label="Finish game with result">${OUTCOMES.map(outcome => `<button class="finish-result ${outcome}" data-game-action="finish" data-finish-outcome="${outcome}" title="Finish game as a ${outcome} and count playtime">${{ win: 'Win', loss: 'Loss', draw: 'Draw' }[outcome]}</button>`).join('')}</div>`;
 
@@ -24,7 +25,7 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     element('map-pool-none').setAttribute('aria-pressed', String(enabled.size === 0));
     element('map-pool-presets').innerHTML = getState().mapPoolPresets.map(preset => {
       const matches = MAPS.every(map => enabled.has(map.id) === preset.mapIds.includes(map.id));
-      return `<div class="pool-chip"><button data-load-pool="${escapeHtml(preset.id)}" aria-pressed="${matches}" title="Load ${escapeHtml(preset.name)}">${escapeHtml(preset.name)}</button><button data-edit-pool="${escapeHtml(preset.id)}" aria-label="Manage ${escapeHtml(preset.name)}" title="Rename or delete">⋯</button></div>`;
+      return `<div class="pool-chip"><button data-load-pool="${escapeHtml(preset.id)}" aria-pressed="${matches}" title="Load ${escapeHtml(preset.name)}">${escapeHtml(preset.name)}</button><button data-edit-pool="${escapeHtml(preset.id)}" aria-label="Manage ${escapeHtml(preset.name)}" title="Rename or delete">${uiIcon('more')}</button></div>`;
     }).join('');
   }
   function syncPoolCheckboxes() {
@@ -116,7 +117,7 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     const map = catalogItem(MAPS, game.map);
     const warnings = gameWarnings(currentSession(getState()), game, id).map;
     return `<button class="game-map ${map ? 'has-image' : ''} ${warnings.length ? 'has-conflict' : ''}" data-game-pick="map" data-game-id="${escapeHtml(id)}" aria-label="Choose map${referenceName(game.map) ? `: ${escapeHtml(referenceName(game.map))}` : ''}${warnings.length ? ` · ${warnings.join(' · ')}` : ''}">
-      ${map ? `<img src="${map.image}" alt="" loading="lazy">` : '<span class="map-placeholder" aria-hidden="true">◇</span>'}
+      ${map ? `<img src="${map.image}" alt="" loading="lazy">` : `<span class="map-placeholder" aria-hidden="true">${uiIcon('map', 32)}</span>`}
       <span class="map-caption"><strong>${escapeHtml(referenceName(game.map) || 'Choose map')}</strong><small>${escapeHtml(game.mode || map?.mode || 'Map not set')}</small>${warningText(warnings)}</span>
     </button>`;
   };
@@ -138,7 +139,7 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     const team = field === 'ourBan' ? 'Our ban' : 'Their ban';
     const warnings = gameWarnings(currentSession(getState()), game, id)[field];
     return `<button class="game-ban ${hero?.role || ''} ${warnings.length ? 'has-conflict' : ''}" data-game-pick="${field}" data-game-id="${escapeHtml(id)}" aria-label="${team}: ${escapeHtml(referenceName(game[field]) || 'not set')}${warnings.length ? ` · ${warnings.join(' · ')}` : ''}">
-      <span class="ban-portrait">${hero ? `<img src="${hero.image}" alt="" loading="lazy">` : '<span aria-hidden="true">⊘</span>'}</span>
+      <span class="ban-portrait">${hero ? `<img src="${hero.image}" alt="" loading="lazy">` : uiIcon('ban', 24)}</span>
       <span><small>${team}</small><strong>${escapeHtml(referenceName(game[field]) || 'Choose hero')}</strong>${warningText(warnings)}</span>
     </button>`;
   };
@@ -171,10 +172,10 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     previousCompletedCount = session.games.length;
     element('games-record').innerHTML = OUTCOMES.map(outcome => `<span class="record-${outcome}" title="${{ win: 'Wins', loss: 'Losses', draw: 'Draws' }[outcome]}">${session.games.filter(game => game.outcome === outcome).length}${{ win: 'W', loss: 'L', draw: 'D' }[outcome]}</span>`).join('');
     const rotation = modeRotation(session.games);
-    element('mode-tracker').innerHTML = MODES.map(mode => `<button class="mode-token ${rotation.played.includes(mode) ? 'played' : ''}" data-pick-mode="${mode}" aria-label="Choose upcoming ${mode} map" title="Choose upcoming ${mode} map${rotation.played.includes(mode) ? ' · already played this rotation' : ''}">${rotation.played.includes(mode) ? '✓ ' : ''}${mode}</button>`).join('');
+    element('mode-tracker').innerHTML = MODES.map(mode => `<button class="mode-token ${rotation.played.includes(mode) ? 'played' : ''}" data-pick-mode="${mode}" aria-label="Choose upcoming ${mode} map" title="Choose upcoming ${mode} map${rotation.played.includes(mode) ? ' · already played this rotation' : ''}">${rotation.played.includes(mode) ? uiIcon('check', 14) + ' ' : ''}${mode}</button>`).join('');
     const card = ({ game, id, number, status }) => `
       <article class="game-card ${status}" data-game-entry="${escapeHtml(id)}">
-        <header class="game-card-heading"><div><strong>Game ${number}</strong><span class="game-stage ${status}">${status === 'live' ? '● In progress' : status === 'completed' ? '✓ Completed' : 'Upcoming'}</span></div>
+        <header class="game-card-heading"><div><strong>Game ${number}</strong><span class="game-stage ${status}">${status === 'live' ? `${uiIcon('dot', 12)} In progress` : status === 'completed' ? `${uiIcon('check', 12)} Completed` : 'Upcoming'}</span></div>
           <div class="game-card-actions">${status === 'live' ? '<button class="quiet" data-game-action="cancel">Back to upcoming</button>' : status === 'upcoming' ? `${readiness.absent.length ? `<span class="attendance-warning">${readiness.absent.length} not marked here</span>` : ''}<button class="primary" data-game-action="start" ${session.activeGame || readiness.filled < 5 ? 'disabled' : ''} title="${session.activeGame ? 'Finish the current game first' : readiness.filled < 5 ? 'Choose a player for all five slots first' : readiness.absent.length ? 'Confirm attendance and start the game' : 'Capture these five players and start the game'}">Start game</button>` : ''}${status === 'upcoming' ? '' : `<button class="quiet" data-edit-game="${escapeHtml(id)}" aria-label="Edit Game ${number}">Edit</button>`}</div>
         </header>
         <div class="game-card-content"><div class="game-map-settings">${mapButton(game, id)}${status === 'upcoming' && referenceName(game.map).trim() && !catalogItem(MAPS, game.map) ? `<label class="field custom-mode-field">Map mode<select id="upcoming-map-mode"><option value="">Choose mode</option>${MODES.map(mode => `<option ${game.mode === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label>` : ''}</div><div class="game-card-details"><div class="game-bans">${banButton(game, 'ourBan', id)}${banButton(game, 'theirBan', id)}</div>
@@ -184,10 +185,10 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     element('game-overview').hidden = session.games.length === 0;
     element('game-overview').innerHTML = session.games.map((game, index) => ({ game, number: index + 1 })).map(({ game, number }) => {
         const map = catalogItem(MAPS, game.map);
-        return `<button class="history-choice" data-history-game="${escapeHtml(game.id)}" aria-label="Game ${number}: ${escapeHtml(referenceName(game.map) || 'Map not set')}, ${game.outcome || 'result not set'}">${map ? `<img src="${map.image}" alt="" loading="lazy">` : '<span class="history-map-placeholder" aria-hidden="true">◇</span>'}<span><small>Game ${number}</small><strong>${escapeHtml(referenceName(game.map) || 'Map not set')}</strong></span><span class="result-mark ${game.outcome || ''}">${{ win: 'W', loss: 'L', draw: 'D' }[game.outcome] || '—'}</span></button>`;
+        return `<button class="history-choice" data-history-game="${escapeHtml(game.id)}" aria-label="Game ${number}: ${escapeHtml(referenceName(game.map) || 'Map not set')}, ${game.outcome || 'result not set'}">${map ? `<img src="${map.image}" alt="" loading="lazy">` : `<span class="history-map-placeholder" aria-hidden="true">${uiIcon('map', 24)}</span>`}<span><small>Game ${number}</small><strong>${escapeHtml(referenceName(game.map) || 'Map not set')}</strong></span><span class="result-mark ${game.outcome || ''}">${{ win: 'W', loss: 'L', draw: 'D' }[game.outcome] || uiIcon('minus', 12)}</span></button>`;
       }).join('');
       const upcoming = { game: getGame(''), id: '', number: session.games.length + (session.activeGame ? 2 : 1), status: 'upcoming' };
-      element('game-rows').innerHTML = session.finished ? '<div class="scrim-finished-banner" role="status">✓ Scrim complete</div>' : session.activeGame ? `<div class="current-games ${prepareNext ? 'preparing-next' : ''}">${card({ game: session.activeGame, id: session.activeGame.id, number: session.games.length + 1, status: 'live' })}${prepareNext ? card(upcoming) : ''}</div><button class="quiet prepare-next" id="prepare-next" aria-expanded="${prepareNext}">${prepareNext ? 'Hide next game' : `Prepare Game ${upcoming.number} →`}</button>` : card(upcoming);
+      element('game-rows').innerHTML = session.finished ? `<div class="scrim-finished-banner" role="status">${uiIcon('check')} Scrim complete</div>` : session.activeGame ? `<div class="current-games ${prepareNext ? 'preparing-next' : ''}">${card({ game: session.activeGame, id: session.activeGame.id, number: session.games.length + 1, status: 'live' })}${prepareNext ? card(upcoming) : ''}</div><button class="quiet prepare-next" id="prepare-next" aria-expanded="${prepareNext}">${prepareNext ? 'Hide next game' : `Prepare Game ${upcoming.number} ${uiIcon('arrowRight')}`}</button>` : card(upcoming);
     element('game-rows').insertAdjacentHTML('beforeend', session.games.map((game, index) => ({ game, id: game.id, number: index + 1, status: 'completed' })).reverse().map(card).join(''));
     element('game-rows').scrollTop = previousScroll;
     const selector = element('game-overview');

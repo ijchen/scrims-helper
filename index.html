@@ -12,20 +12,20 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="./" aria-label="Scrims Helper home"><span class="brand-mark">S↗</span><span>Scrims Helper</span></a>
+    <a class="brand" href="./" aria-label="Scrims Helper home"><span class="brand-mark">S<svg class="ui-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6H7m11 0v11"/></svg></span><span>Scrims Helper</span></a>
     <nav aria-label="Scrim tools">
       <button id="manage-directory-button" class="icon-button" aria-label="Player directory" title="Player directory"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1Zm0 0v15"/></svg></button>
-      <button id="theme-toggle" class="icon-button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☀</button>
-      <button id="settings-button" class="icon-button" aria-label="Settings and backups" title="Settings and backups">⚙</button>
+      <button id="theme-toggle" class="icon-button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme"><svg class="ui-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button>
+      <button id="settings-button" class="icon-button" aria-label="Settings and backups" title="Settings and backups"><svg class="ui-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.033 4.659L10.608 2.097L13.392 2.097L13.967 4.659L15.800 5.418L18.018 4.014L19.986 5.982L18.582 8.200L19.341 10.033L21.903 10.608L21.903 13.392L19.341 13.967L18.582 15.800L19.986 18.018L18.018 19.986L15.800 18.582L13.967 19.341L13.392 21.903L10.608 21.903L10.033 19.341L8.200 18.582L5.982 19.986L4.014 18.018L5.418 15.800L4.659 13.967L2.097 13.392L2.097 10.608L4.659 10.033L5.418 8.200L4.014 5.982L5.982 4.014L8.200 5.418Z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
     </nav>
   </header>
 
   <main>
     <div id="storage-warning" class="warning" hidden></div>
     <section class="scrim-summary" aria-label="Scrim overview">
-      <div class="summary-name"><label for="session-title">Scrim name</label><div class="summary-input"><input id="session-title" maxlength="100" placeholder="Scrim name" autocomplete="off"><button id="scrim-switcher-button" class="secondary" aria-label="Switch scrim" title="Saved scrims">▾</button></div></div>
+      <div class="summary-name"><label for="session-title">Scrim name</label><div class="summary-input"><input id="session-title" maxlength="100" placeholder="Scrim name" autocomplete="off"><button id="scrim-switcher-button" class="secondary" aria-label="Switch scrim" title="Saved scrims"><svg class="ui-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div></div>
       <div class="summary-schedule"><label for="scrim-time-button">Scrim time</label><div class="summary-input"><button class="secondary" id="scrim-time-button" title="Edit scrim time"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg><span id="scrim-time-label">Set time</span></button><button class="secondary" id="copy-scrim-time" aria-label="Copy Discord timestamp" title="Copy Discord timestamp"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg></button></div></div>
-      <div class="summary-contact"><label for="contact">Contact Battle.net</label><div class="summary-input"><input id="contact" maxlength="100" placeholder="BattleTag#1234" autocomplete="off" spellcheck="false"><button id="copy-contact" class="secondary" aria-label="Copy contact BattleTag" title="Copy contact BattleTag"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg>Copy</button></div></div>
+      <div class="summary-contact"><label for="contact">Contact</label><div class="summary-input"><input id="contact" maxlength="100" placeholder="Contact#1234" autocomplete="off" spellcheck="false"><button id="copy-contact" class="secondary" aria-label="Copy contact" title="Copy contact"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg>Copy</button></div></div>
       <div class="summary-stat"><strong id="present-count">0 / 0</strong><span>players here</span></div>
       <div class="summary-stat"><span class="summary-games-line"><strong id="game-count">0</strong><span id="games-record" aria-label="Completed game results"></span></span><span>games played</span></div>
       <div class="quick-tools"><button id="copy-scrim-code" class="secondary" title="Copy scrim code" aria-label="Copy scrim code DKEEH"><span id="scrim-code-label">DKEEH</span><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg></button><button id="coin-flip" class="secondary" title="Flip a coin"><span class="coin-scene" aria-hidden="true"><span id="coin-disc" class="coin-disc"><span class="coin-face coin-heads">H</span><span class="coin-face coin-tails">T</span></span></span><span id="coin-result" aria-live="polite">Flip coin</span></button></div>
@@ -43,7 +43,7 @@
     <section id="empty-roster" class="empty-state" hidden><span class="empty-icon" aria-hidden="true">+</span><h2>Add your players</h2><button id="add-players" class="primary">+ Players</button></section>
     <div id="panel-divider" role="separator" tabindex="0" aria-label="Resize roster and games" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="62" aria-controls="board games-section" title="Resize panels"></div>
     <section id="games-section" class="games-section" aria-labelledby="games-heading">
-      <div class="section-title"><h2 id="games-heading">Games</h2><button id="undo-game" class="quiet" title="Undo last completed game">↶ Undo game</button><div class="scrim-tools"><button id="finish-scrim" class="secondary compact-action">Finish scrim</button><button id="toggle-bans" class="secondary compact-action" aria-pressed="true">Bans on</button><button id="edit-map-pool" class="secondary compact-action">Edit map pool</button></div></div>
+      <div class="section-title"><h2 id="games-heading">Games</h2><button id="undo-game" class="quiet" title="Undo last completed game"><svg class="ui-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v6h6M4 10a8 8 0 1 1 1 9"/></svg> Undo game</button><div class="scrim-tools"><button id="finish-scrim" class="secondary compact-action">Finish scrim</button><button id="toggle-bans" class="secondary compact-action" aria-pressed="true">Bans on</button><button id="edit-map-pool" class="secondary compact-action">Edit map pool</button></div></div>
       <div id="mode-tracker" class="mode-tracker" aria-label="Map mode rotation"></div>
       <nav id="game-overview" class="game-history-selector" aria-label="Jump to a completed game" hidden></nav>
       <div id="game-rows" class="game-rows"></div>
@@ -52,18 +52,18 @@
   </main>
 
   <dialog id="scrim-time-dialog" aria-labelledby="scrim-time-heading">
-    <div class="dialog-heading"><h2 id="scrim-time-heading">Scrim time</h2><button class="icon-button" data-close="scrim-time-dialog" aria-label="Close scrim time">×</button></div>
+    <div class="dialog-heading"><h2 id="scrim-time-heading">Scrim time</h2><button class="icon-button" data-close="scrim-time-dialog" aria-label="Close scrim time"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <label class="game-code-setting">Eastern time<input id="scrim-time-input" type="datetime-local" step="60" min="0001-01-01T00:00" max="9999-12-31T23:59"></label>
     <p id="scrim-time-error" class="error-text" role="alert" hidden></p>
   </dialog>
   <dialog id="priority-dialog" aria-labelledby="priority-heading">
-    <div class="dialog-heading"><h2 id="priority-heading">Autofill priority</h2><button class="icon-button" data-close="priority-dialog" aria-label="Close priority">×</button></div>
+    <div class="dialog-heading"><h2 id="priority-heading">Autofill priority</h2><button class="icon-button" data-close="priority-dialog" aria-label="Close priority"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <div class="priority-summary"><span id="priority-player"></span><output id="priority-value" for="priority-slider" aria-live="polite">1×</output></div>
     <input id="priority-slider" class="priority-slider" type="range" min="0" max="10" step="1" value="5" aria-label="Autofill priority for this scrim">
     <div id="priority-ticks" class="priority-ticks" aria-hidden="true"></div>
   </dialog>
   <dialog id="settings-dialog" aria-labelledby="settings-heading">
-    <div class="dialog-heading"><h2 id="settings-heading">Scrims Helper settings</h2><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
+    <div class="dialog-heading"><h2 id="settings-heading">Scrims Helper settings</h2><button class="icon-button" data-close="settings-dialog" aria-label="Close settings"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <div class="settings-section bar-layout-setting">
       <h3 id="bar-layout-heading">Game bars</h3>
       <div id="bar-layout" class="bar-layout-options" role="group" aria-labelledby="bar-layout-heading">
@@ -95,7 +95,7 @@
   </dialog>
 
   <dialog id="export-dialog" aria-labelledby="export-heading">
-    <div class="dialog-heading"><h2 id="export-heading">Export</h2><button class="icon-button" data-close="export-dialog" aria-label="Close export">×</button></div>
+    <div class="dialog-heading"><h2 id="export-heading">Export</h2><button class="icon-button" data-close="export-dialog" aria-label="Close export"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <div id="export-options" class="transfer-options"></div>
     <div class="dialog-footer"><button class="secondary" data-close="export-dialog">Cancel</button><button id="export-download" class="primary">Download</button></div>
   </dialog>
@@ -106,14 +106,14 @@
     <div class="dialog-footer"><button id="storage-start-fresh" class="secondary">Start fresh</button><button id="storage-import" class="primary">Import backup</button></div>
   </dialog>
   <dialog id="import-dialog" aria-labelledby="import-heading">
-    <div class="dialog-heading"><h2 id="import-heading">Import</h2><button class="icon-button" data-close="import-dialog" aria-label="Close import">×</button></div>
+    <div class="dialog-heading"><h2 id="import-heading">Import</h2><button class="icon-button" data-close="import-dialog" aria-label="Close import"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <div id="import-options" class="transfer-options"></div>
     <label id="clear-import-scrims-row" class="transfer-check" hidden><input id="clear-import-scrims" type="checkbox">Clear all existing scrims</label>
     <p id="import-preview" class="small" aria-live="polite"></p>
     <div class="dialog-footer"><button class="secondary" data-close="import-dialog">Cancel</button><button id="import-apply" class="primary">Apply import</button></div>
   </dialog>
   <dialog id="delete-data-dialog" aria-labelledby="delete-data-heading">
-    <div class="dialog-heading"><h2 id="delete-data-heading">Delete all saved data?</h2><button class="icon-button" data-close="delete-data-dialog" aria-label="Cancel deletion">×</button></div>
+    <div class="dialog-heading"><h2 id="delete-data-heading">Delete all saved data?</h2><button class="icon-button" data-close="delete-data-dialog" aria-label="Cancel deletion"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <p class="small">Permanently delete every scrim, player, preset, custom code, and display preference saved by this app on this browser. This cannot be undone.</p>
     <label class="game-code-setting">Type “delete everything” to confirm<input id="delete-data-confirmation" autocomplete="off" spellcheck="false"></label>
     <p id="delete-data-error" class="small" role="alert"></p>
@@ -121,50 +121,75 @@
   </dialog>
 
   <dialog id="scrim-switcher" aria-labelledby="scrim-switcher-heading">
-    <div class="dialog-heading"><h2 id="scrim-switcher-heading">Your scrims</h2><button class="icon-button" data-close="scrim-switcher" aria-label="Close scrim switcher">×</button></div>
+    <div class="dialog-heading"><h2 id="scrim-switcher-heading">Your scrims</h2><button class="icon-button" data-close="scrim-switcher" aria-label="Close scrim switcher"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <div class="button-row"><button id="create-blank-scrim" class="primary">+ New scrim</button><button id="copy-scrim-setup" class="secondary">Use current roster &amp; map pool</button></div>
     <div id="saved-scrim-list"></div>
   </dialog>
   <dialog id="scrim-editor" aria-labelledby="scrim-editor-heading">
-    <div class="dialog-heading"><h2 id="scrim-editor-heading">Edit scrim</h2><button class="icon-button" data-close="scrim-editor" aria-label="Close scrim editor">×</button></div>
+    <div class="dialog-heading"><h2 id="scrim-editor-heading">Edit scrim</h2><button class="icon-button" data-close="scrim-editor" aria-label="Close scrim editor"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <label class="game-code-setting">Scrim name<input id="saved-scrim-name" maxlength="100" autocomplete="off"></label>
     <div class="dialog-footer"><button id="delete-saved-scrim" data-shift-label="Delete now" class="quiet danger">Delete scrim</button><button class="secondary" data-close="scrim-editor">Done</button></div>
   </dialog>
   <dialog id="directory-dialog" aria-labelledby="roster-picker-heading">
-    <div class="dialog-heading"><div><h2 id="roster-picker-heading">Add players</h2></div><button class="icon-button" data-close="directory-dialog" aria-label="Close roster picker">×</button></div>
+    <div class="dialog-heading"><div><h2 id="roster-picker-heading">Add players</h2></div><button class="icon-button" data-close="directory-dialog" aria-label="Close roster picker"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <div class="directory-toolbar"><input id="directory-search" type="search" placeholder="Search players" aria-label="Search player directory"><button id="create-player" class="primary">+ New player</button></div>
     <div id="directory-list"></div>
     <div class="dialog-footer"><span id="pending-removals" class="muted small" aria-live="polite"></span><button class="secondary" data-close="directory-dialog" data-apply-removals data-shift-label="Remove now">Done</button></div>
   </dialog>
 
   <dialog id="manage-directory-dialog" aria-labelledby="manage-directory-heading">
-    <div class="dialog-heading"><h2 id="manage-directory-heading">Player directory</h2><button class="icon-button" data-close="manage-directory-dialog" aria-label="Close player directory">×</button></div>
-    <div class="directory-toolbar"><input id="manage-directory-search" type="search" placeholder="Search players" aria-label="Search all players"><button id="directory-create-player" class="primary">+ New player</button></div>
-    <div id="manage-directory-list"></div>
-    <div class="dialog-footer"><span id="directory-player-count" class="muted small"></span><button class="secondary" data-close="manage-directory-dialog">Done</button></div>
+    <div class="dialog-heading"><h2 id="manage-directory-heading">Player directory</h2><button class="icon-button" data-close="manage-directory-dialog" aria-label="Close player directory"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
+    <div class="directory-navigation"><div class="directory-tabs" role="tablist" aria-label="Player directory">
+      <button id="directory-players-tab" role="tab" aria-selected="true" aria-controls="directory-players-panel" tabindex="0">Players</button>
+      <button id="directory-statuses-tab" role="tab" aria-selected="false" aria-controls="directory-statuses-panel" tabindex="-1">Statuses</button>
+    </div></div>
+    <div class="directory-panels">
+    <div id="directory-players-panel" role="tabpanel" aria-labelledby="directory-players-tab">
+      <div class="directory-toolbar"><input id="manage-directory-search" type="search" placeholder="Search players" aria-label="Search all players"><button id="directory-create-player" class="primary">+ New player</button></div>
+      <div id="manage-directory-list"></div>
+    </div>
+    <div id="directory-statuses-panel" role="tabpanel" aria-labelledby="directory-statuses-tab" hidden>
+      <div id="statuses-list-view">
+        <div class="directory-toolbar"><input id="status-search" type="search" placeholder="Search statuses" aria-label="Search statuses"><button id="add-status" class="primary">+ New status</button></div>
+        <div id="statuses-list"></div>
+      </div>
+      <div id="status-editor" hidden>
+    <form id="status-form">
+      <div class="dialog-heading"><button type="button" id="status-back" class="quiet"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg>Statuses</button><h3 id="status-editor-heading">New status</h3></div>
+      <label>Status name<input id="status-name" maxlength="80" autocomplete="off" placeholder="Status name"></label>
+      <div class="status-appearance"><label class="status-color-label">Badge color<input id="status-color" type="color" value="#52805b"></label><span id="status-preview" class="status-badge"></span></div>
+      <label class="status-badge-toggle"><input id="status-show-badge" type="checkbox" checked>Show badge</label>
+      <fieldset class="status-priority-field"><div class="priority-summary"><label for="status-priority">Default autofill priority</label><output id="status-priority-value" for="status-priority" aria-live="polite">1×</output></div><input id="status-priority" class="priority-slider" type="range" min="0" max="10" step="1" value="5" aria-label="Default autofill priority"><div id="status-priority-ticks" class="priority-ticks" aria-hidden="true"></div></fieldset>
+      <p id="status-error" class="error-text" role="alert"></p>
+      <div class="dialog-footer"><button type="button" id="delete-status" class="quiet danger" data-shift-label="Delete now">Delete status</button><button type="submit" class="primary">Done</button></div>
+    </form>
+      </div>
+    </div>
+    </div>
+    <div id="directory-footer" class="dialog-footer"><span id="directory-player-count" class="muted small"></span><span id="directory-status-count" class="muted small" hidden></span><button class="secondary" data-close="manage-directory-dialog">Done</button></div>
   </dialog>
 
   <dialog id="player-notes-dialog" aria-labelledby="player-notes-heading">
-    <div class="dialog-heading"><h2 id="player-notes-heading">Player notes</h2><button class="icon-button" data-close="player-notes-dialog" aria-label="Close notes">×</button></div>
+    <div class="dialog-heading"><h2 id="player-notes-heading">Player notes</h2><button class="icon-button" data-close="player-notes-dialog" aria-label="Close notes"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <textarea id="quick-player-notes" maxlength="500" rows="6" aria-labelledby="player-notes-heading" placeholder="Notes"></textarea>
     <div class="dialog-footer"><span></span><button class="secondary" data-close="player-notes-dialog">Done</button></div>
   </dialog>
 
   <dialog id="player-dialog">
     <form id="player-form">
-      <div class="dialog-heading"><div><h2 id="player-form-heading">New player</h2></div><button type="button" class="icon-button" data-close="player-dialog" aria-label="Close player editor">×</button></div>
+      <div class="dialog-heading"><div><h2 id="player-form-heading">New player</h2></div><button type="button" class="icon-button" data-close="player-dialog" aria-label="Close player editor"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
       <input id="player-id" type="hidden">
       <label>Display name<input id="player-name" maxlength="80" autocomplete="off" placeholder="Player name"></label>
       <label>Battle.net account<input id="player-tag" maxlength="100" autocomplete="off" placeholder="BattleTag#1234"></label>
-      <label>Player status<select id="player-status"><option value="default">Default</option><option value="trial">Trial</option><option value="team">Team member</option><option value="ringer">Ringer</option></select></label>
+      <label>Player status<select id="player-status"></select></label>
       <fieldset><legend>Roles</legend><div id="player-roles" class="role-checkboxes"></div></fieldset>
       <label>Notes (optional)<textarea id="player-notes" maxlength="500" rows="3" placeholder="Notes"></textarea></label>
       <p id="player-error" class="error-text" role="alert"></p>
-      <div class="dialog-footer"><button type="button" class="quiet danger" id="delete-player" data-shift-label="Delete now">Delete player</button><span class="muted small">Changes save automatically</span><button type="submit" class="primary">Done</button></div>
+      <div class="dialog-footer"><button type="button" class="quiet danger" id="delete-player" data-shift-label="Delete now">Delete player</button><button type="submit" class="primary">Done</button></div>
     </form>
   </dialog>
   <dialog id="swaps-dialog" aria-labelledby="swaps-heading">
-    <div class="dialog-heading"><h2 id="swaps-heading">Lineup swaps</h2><button class="icon-button" data-close="swaps-dialog" aria-label="Close swaps">×</button></div>
+    <div class="dialog-heading"><h2 id="swaps-heading">Lineup swaps</h2><button class="icon-button" data-close="swaps-dialog" aria-label="Close swaps"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <p id="swaps-source" class="muted small"></p>
     <div id="swaps-list"></div>
     <label id="swaps-message-field" class="field">Message<textarea id="swaps-message" rows="3" readonly></textarea></label>
@@ -172,26 +197,26 @@
   </dialog>
   <dialog id="confirm-dialog"><h2 id="confirm-title"></h2><p id="confirm-description" class="muted"></p><div class="dialog-footer"><button id="confirm-cancel" class="secondary">Cancel</button><button id="confirm-accept" class="primary">Continue</button></div></dialog>
   <dialog id="game-editor" aria-labelledby="game-editor-heading">
-    <div class="dialog-heading"><h2 id="game-editor-heading">Edit game</h2><button class="icon-button" data-close="game-editor" aria-label="Close game editor">×</button></div>
+    <div class="dialog-heading"><h2 id="game-editor-heading">Edit game</h2><button class="icon-button" data-close="game-editor" aria-label="Close game editor"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <div id="game-editor-fields"></div>
     <h3 class="editor-roster-heading">Players who played</h3><div id="game-editor-roster"></div>
     <div class="dialog-footer"><button id="reopen-game" class="quiet" hidden>Mark in progress</button><span class="muted small">Edits save automatically and update playtime.</span><button class="primary" data-close="game-editor">Done</button></div>
   </dialog>
   <dialog id="catalog-dialog" aria-labelledby="catalog-heading">
-    <div class="dialog-heading"><h2 id="catalog-heading">Choose map</h2><button class="icon-button" data-close="catalog-dialog" aria-label="Close picker">×</button></div>
+    <div class="dialog-heading"><h2 id="catalog-heading">Choose map</h2><button class="icon-button" data-close="catalog-dialog" aria-label="Close picker"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <input id="catalog-search" type="search" maxlength="100" autocomplete="off" spellcheck="false" aria-label="Search maps or heroes" aria-controls="catalog-results">
     <div id="catalog-filters" class="catalog-filters"></div><div id="catalog-results" class="catalog-results"></div>
     <div class="catalog-footer"><button id="catalog-clear" class="quiet">Clear selection</button><button id="catalog-custom" class="quiet" hidden></button></div>
   </dialog>
   <dialog id="map-pool-dialog" aria-labelledby="map-pool-heading">
-    <div class="dialog-heading"><h2 id="map-pool-heading">Map pool</h2><button class="icon-button" data-close="map-pool-dialog" aria-label="Close map pool">×</button></div>
+    <div class="dialog-heading"><h2 id="map-pool-heading">Map pool</h2><button class="icon-button" data-close="map-pool-dialog" aria-label="Close map pool"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
     <div class="pool-shortcuts"><div class="pool-builtins"><button id="map-pool-all" aria-label="Enable all maps">All</button><button id="map-pool-none" aria-label="Disable all maps">None</button></div><div id="map-pool-presets"></div><button id="save-pool-button" class="quiet">+ Save pool</button></div>
     <div id="map-pool-list"></div>
     <div class="dialog-footer"><span class="muted small">Saved automatically for this scrim.</span><button class="secondary" data-close="map-pool-dialog">Done</button></div>
   </dialog>
   <dialog id="pool-preset-editor" aria-labelledby="pool-preset-heading">
     <form id="save-map-pool-form">
-      <div class="dialog-heading"><h2 id="pool-preset-heading">Save pool</h2><button type="button" class="icon-button" data-close="pool-preset-editor" aria-label="Close preset editor">×</button></div>
+      <div class="dialog-heading"><h2 id="pool-preset-heading">Save pool</h2><button type="button" class="icon-button" data-close="pool-preset-editor" aria-label="Close preset editor"><svg class="ui-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
       <label>Pool name<input id="map-pool-name" maxlength="80" required autocomplete="off"></label>
       <p id="map-pool-feedback" class="error-text small" role="alert"></p>
       <div class="dialog-footer"><button id="delete-map-pool" data-shift-label="Delete now" type="button" class="quiet danger">Delete pool</button><button id="save-preset-submit" class="primary" type="submit">Save</button></div>
@@ -199,6 +224,6 @@
   </dialog>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <div id="notes-preview" role="tooltip" hidden></div>
-  <div id="bench-drop-hint" role="status" hidden>↓ Drop to bench</div>
+  <div id="bench-drop-hint" role="status" hidden><svg class="ui-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16m-6-6 6 6 6-6"/></svg> Drop to bench</div>
 </body>
 </html>
