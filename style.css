@@ -116,8 +116,9 @@ main { max-width: 1600px; padding: 18px 32px; margin: auto; }
 .attendance-cell { display: flex; align-items: center; gap: 4px; }
 .attendance-cell .attendance { flex-shrink: 0; }
 .lineup-badge { position: relative; display: grid; place-items: center; background: var(--tint); border-radius: 6px; width: 32px; height: 32px; flex-shrink: 0; }
-.lineup-badge svg { width: 24px; height: 24px; }
+.lineup-badge > svg { width: 24px; height: 24px; }
 .role-alert { display: grid; place-items: center; position: absolute; top: -3px; right: -3px; border-radius: 50%; background: #9a265f; color: white; font-size: 10px; font-weight: 700; width: 13px; height: 13px; text-align: center; }
+.lineup-badge .role-alert > svg { width: 10px; height: 10px; }
 .lineup-badge.unusual { color: #9a265f; background: #f8cddd; }
 .roster-row { cursor: pointer; transition: background-color .14s, box-shadow .14s, opacity .14s; }
 .roster-row.not-present { opacity: .65; }
