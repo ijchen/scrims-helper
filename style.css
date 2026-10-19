@@ -569,3 +569,25 @@ legend { font-size: 12px; font-weight: 600; margin-bottom: 10px; }
 @media (prefers-reduced-motion: reduce) {
   .status-sorting > .directory-row { transition: none; }
 }
+
+.lineup-slot { position: relative; min-width: 0; display: grid; }
+.lineup-slot.tank-slot { grid-column: 1 / -1; }
+/* Keep the original role header; its native select is an invisible hit target. */
+.lineup-strip .slot-role-select {
+  position: absolute; z-index: 1; top: 11px; left: 12px;
+  width: calc(100% - 24px); height: 17px; min-width: 0;
+  padding: 0; border: 0; opacity: 0; cursor: pointer;
+}
+.slot-role { min-width: 0; height: 17px; }
+.slot-role > svg { flex-shrink: 0; }
+.slot-role-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-role .slot-role-chevron { width: 10px; height: 10px; margin-left: auto; opacity: .55; }
+.lineup-slot:has(.slot-role-select:hover) .slot-role-chevron,
+.lineup-slot:has(.slot-role-select:focus-visible) .slot-role-chevron { opacity: 1; }
+.lineup-slot:has(.slot-role-select:focus-visible) .slot-role { outline: 2px solid var(--role); outline-offset: 3px; border-radius: 2px; }
+@container (max-width: 620px) {
+  .lineup-strip .slot-role-select { top: 8px; left: 5px; width: calc(100% - 10px); }
+}
+
+.slot-role-muted { opacity: .42; font-weight: 400; }
+.bar-segment.unknown-game { opacity: .5; }

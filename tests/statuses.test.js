@@ -1,3 +1,4 @@
+import { defaultSlot, snapshotRole } from './fixtures.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newState, currentSession, setPlayerPriority, validateState, createScrim, removeAttendee, autofillLineup, ROLES, newAttendee } from '../model.js';
@@ -80,7 +81,7 @@ test('prerelease formats and incomplete records are rejected without repair', ()
     assert.throws(() => restoreSavedState(raw));
     assert.equal(JSON.stringify(invalid), raw);
   }
-  assert.throws(() => readImport({ format: 'scrims-helper-export', version: 1, schema: 'scrims-helper-v1', data: { players: state.players } }));
+  assert.throws(() => readImport({ format: 'scrims-helper-export', version: 1, data: { players: state.players } }));
 });
 
 test('custom statuses travel with directory backups and follow merge, replace, and skip', () => {
@@ -117,14 +118,14 @@ test('trial identity has no tiebreak advantage when effective priorities are equ
   for (const role of ROLES.slice(1)) {
     state.players.push({ ...player(role, 'default'), roles: [role] });
     currentSession(state).attendees.push({ playerId: role, present: true, priority: '1' });
-    currentSession(state).lineup[role] = role;
+    currentSession(state).lineup[defaultSlot(role)].playerId = role;
   }
   state.players.push(player('trial'), player('regular', 'default'));
   currentSession(state).attendees.push({ playerId: 'trial', present: true, priority: '1' }, { playerId: 'regular', present: true, priority: '1' });
-  assert.equal(autofillLineup(state, () => 0n).Tank, 'regular');
-  assert.equal(autofillLineup(state, limit => limit - 1n).Tank, 'trial');
+  assert.equal(autofillLineup(state, () => 0n).tank.playerId, 'regular');
+  assert.equal(autofillLineup(state, limit => limit - 1n).tank.playerId, 'trial');
   setPlayerPriority(state, 'trial', null);
-  assert.equal(autofillLineup(state).Tank, 'trial');
+  assert.equal(autofillLineup(state).tank.playerId, 'trial');
 });
 
 

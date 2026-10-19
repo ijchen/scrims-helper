@@ -14,7 +14,7 @@ export function exportData(state, selected) {
   if (selected.scrims) data.scrims = { activeId: state.activeScrimId, items: allScrims(state) };
   for (const key of ['players', 'mapPoolPresets', 'customGameCode']) if (selected[key]) data[key] = state[key];
   if (!Object.keys(data).length) throw new Error('Choose something to export.');
-  return { format: 'scrims-helper-export', version: STATE_VERSION, schema: 'scrims-helper-v1', data: structuredClone(data) };
+  return { format: 'scrims-helper-export', version: STATE_VERSION, data: structuredClone(data) };
 }
 
 function withScrims(state, scrims) {
@@ -27,8 +27,8 @@ function withScrims(state, scrims) {
 }
 
 export function readImport(input) {
-  if (input?.format !== 'scrims-helper-export' || input.version !== STATE_VERSION || input.schema !== `scrims-helper-v${input.version}`) throw new Error('This backup uses an unsupported format.');
-  if (Object.keys(input).some(key => !['format', 'version', 'schema', 'data'].includes(key))) throw new Error('Unrecognized export fields.');
+  if (input?.format !== 'scrims-helper-export' || input.version !== STATE_VERSION) throw new Error('This backup uses an unsupported format.');
+  if (Object.keys(input).some(key => !['format', 'version', 'data'].includes(key))) throw new Error('Unrecognized export fields.');
   const data = input.data;
   if (!data || typeof data !== 'object' || Array.isArray(data) || !Object.keys(data).length || Object.keys(data).some(key => !owns(BACKUP_CATEGORIES, key) && !['statuses', 'statusOrder'].includes(key))) throw new Error('Unrecognized export format.');
   if (owns(data, 'scrims') && !owns(data, 'players')) throw new Error('This file contains scrims without their player directory.');
@@ -84,7 +84,6 @@ export function planImport(current, data, choices) {
     }
     const names = next.statuses.map(status => status.name.trim().toLowerCase());
     if (new Set(names).size !== names.length) throw new Error('Different statuses have the same name. Rename a status first, or replace the player directory.');
-    summary.push(mode('players') === 'replace' ? 'Status order: use imported order.' : 'Status order: imported order first, then local-only statuses.');
   }
   for (const key of ['players', 'mapPoolPresets']) if (mode(key) !== 'skip') next[key] = combine(key, current[key], data[key], key === 'players' ? 'Players' : BACKUP_CATEGORIES[key]);
   if (mode('scrims') !== 'skip') {

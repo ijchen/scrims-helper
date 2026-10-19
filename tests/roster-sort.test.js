@@ -1,3 +1,4 @@
+import { defaultSlot, snapshotRole } from './fixtures.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newState, currentSession, sortedAttendees, setPlayerPriority, emptyLineup, newAttendee } from '../model.js';
@@ -7,7 +8,7 @@ function add(state, id, games = 0, status = 'default', present = true) {
   currentSession(state).attendees.push(newAttendee(state, id, present));
   for (let index = 0; index < games; index++) {
     currentSession(state).games[index] ??= { lineup: [] };
-    currentSession(state).games[index].lineup.push({ playerId: id, role: 'Tank' });
+    currentSession(state).games[index].lineup.push({ playerId: id, ...snapshotRole('Tank') });
   }
 }
 const order = state => sortedAttendees(state).map(attendee => attendee.playerId);
@@ -40,15 +41,15 @@ test('active main games count, fill games do not, and selected lineup never chan
   add(state, 'Alex');
   add(state, 'Blake');
   const session = currentSession(state);
-  session.games = [{ lineup: [{ playerId: 'Alex', role: 'MS' }] }];
+  session.games = [{ lineup: [{ playerId: 'Alex', ...snapshotRole('MS') }] }];
   assert.deepEqual(order(state), ['Alex', 'Blake']);
-  session.activeGame = { lineup: [{ playerId: 'Alex', role: 'Tank' }] };
+  session.activeGame = { lineup: [{ playerId: 'Alex', ...snapshotRole('Tank') }] };
   assert.deepEqual(order(state), ['Blake', 'Alex']);
   const before = structuredClone(state);
   order(state);
   assert.deepEqual(state, before);
-  session.lineup = { ...emptyLineup(), Tank: 'Blake', MS: 'Alex' };
+  session.lineup = { ...emptyLineup(), tank: { allowedRoles: ['Tank'], playerId: 'Blake' }, support1: { allowedRoles: ['MS'], playerId: 'Alex' } };
   assert.deepEqual(order(state), ['Blake', 'Alex']);
-  session.activeGame.lineup[0].role = 'MS';
+  session.activeGame.lineup[0].roles = ['MS'];
   assert.deepEqual(order(state), ['Alex', 'Blake']);
 });

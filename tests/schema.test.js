@@ -1,3 +1,4 @@
+import { defaultSlot, snapshotRole } from './fixtures.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newState, currentSession, ROLES, startGame, finishGame, validateState, newAttendee } from '../model.js';
@@ -23,7 +24,7 @@ test('v1 round trip preserves snapshots, custom names, unknown IDs and all share
     const id = crypto.randomUUID();
     state.players.push({ id, name: role, battletag: role + '#123', roles: [role], status: 'ringer', notes: 'Notes' });
     session.attendees.push(newAttendee(state, id, true));
-    session.lineup[role] = id;
+    session.lineup[defaultSlot(role)].playerId = id;
   }
   session.draft = { map: mapRef('Ilios'), mode: 'Control', ourBan: heroRef('Ana'), theirBan: { id: '', name: 'Custom hero' } };
   startGame(state, crypto.randomUUID(), '2026-09-28T12:00:00Z');
@@ -50,7 +51,7 @@ test('v1 rejects unexpected fields and broken relationships without repairing th
     state => { delete state.format; },
     state => { state.unexpected = true; },
     state => { state.activeScrimId = 'missing'; },
-    state => { currentSession(state).lineup.Tank = 'missing'; },
+    state => { currentSession(state).lineup.tank.playerId = 'missing'; },
     state => { currentSession(state).draft.map = { id: 'ilios', name: 'Ilios', extra: true }; },
     state => { currentSession(state).draft.ourBan = 'Ana'; },
   ]) {

@@ -1,3 +1,5 @@
+import { SLOTS, DEFAULT_SLOT_ROLES, slotGroup, roleGroup, rolesInclude, resolveRoles, validSlotRoles } from './roles.js';
+export { SLOTS, slotGroup, roleGroup, rolesInclude, roleLabel } from './roles.js';
 import { MAPS, HEROES } from './catalog.js';
 import { normalizeSearch } from './search.js';
 import { defaultScrimTime } from './scrim-time.js';
@@ -35,20 +37,20 @@ export const STORAGE_KEY = 'scrims-helper.state';
 export function lineupSwaps(state) {
   const source = currentSession(state).activeGame || currentSession(state).games.at(-1);
   if (!source) throw new Error('Start a game first to compare lineups.');
-  const next = ROLES.map(role => {
-    const player = state.players.find(player => player.id === currentSession(state).lineup[role]);
-    return player ? { role, playerId: player.id, name: player.name, battletag: player.battletag } : null;
+  const next = SLOTS.map(role => {
+    const player = state.players.find(player => player.id === currentSession(state).lineup[role].playerId);
+    return player ? { slot: role, roles: playedRoles(currentSession(state), role, player), playerId: player.id, name: player.name, battletag: player.battletag } : null;
   });
   if (next.some(slot => !slot) || new Set(next.map(slot => slot.playerId)).size !== 5) throw new Error('Fill all five lineup slots to see swaps.');
   const incoming = next.filter(slot => !source.lineup.some(previous => previous.playerId === slot.playerId));
-  const outgoing = ROLES.map(role => source.lineup.find(slot => slot.role === role)).filter(slot => slot && !next.some(player => player.playerId === slot.playerId));
+  const outgoing = source.lineup.filter(slot => slot && !next.some(player => player.playerId === slot.playerId));
   let best = { score: Infinity, pairs: [] };
   function match(remaining, pairs, score) {
     if (score >= best.score) return;
     if (pairs.length === incoming.length) { best = { score, pairs }; return; }
     const player = incoming[pairs.length];
     remaining.forEach((previous, index) => {
-      const cost = player.role === previous.role ? 0 : roleGroup(player.role) === roleGroup(previous.role) ? 1 : 10;
+      const cost = player.roles.length === 1 && previous.roles.length === 1 && player.roles[0] === previous.roles[0] ? 0 : slotGroup(player.slot) === slotGroup(previous.slot) ? 1 : 10;
       match(remaining.filter((_, otherIndex) => otherIndex !== index), [...pairs, { incoming: player, outgoing: previous }], score + cost);
     });
   }
@@ -84,7 +86,7 @@ export function modeRotation(games) {
 }
 
 export function emptyLineup() {
-  return Object.fromEntries(ROLES.map(role => [role, '']));
+  return Object.fromEntries(SLOTS.map(slot => [slot, { allowedRoles: [...DEFAULT_SLOT_ROLES[slot]], playerId: '' }]));
 }
 
 export function newSession(now = new Date()) {
@@ -130,6 +132,7 @@ export function createScrim(state, id, createdAt, copySetup = false) {
     session.attendees = currentSession(state).attendees.map(attendee => newAttendee(state, attendee.playerId));
     session.disabledMapIds = [...currentSession(state).disabledMapIds];
     session.bansEnabled = currentSession(state).bansEnabled !== false;
+    for (const slot of SLOTS) session.lineup[slot].allowedRoles = [...currentSession(state).lineup[slot].allowedRoles];
   }
   state.scrims.push({ id, createdAt, session });
   state.activeScrimId = id;
@@ -178,18 +181,28 @@ export function renameMapPoolPreset(state, id, name) {
   preset.name = trimmedName;
 }
 
-export function roleGroup(role) {
-  return { Tank: 'tank', HSDPS: 'dps', FDPS: 'dps', MS: 'support', FS: 'support' }[role];
+// Slot keys stay stable; their allowed subroles can vary independently.
+export function slotRoles(session, slot) {
+  return session.lineup[slot].allowedRoles;
+}
+
+export function playedRoles(session, slot, player) {
+  return resolveRoles(slotRoles(session, slot), player);
+}
+
+export function setSlotRoles(state, slot, roles) {
+  if (!validSlotRoles(slot, roles)) throw new Error('Choose roles from the same role group.');
+  currentSession(state).lineup[slot].allowedRoles = ROLES.filter(role => roles.includes(role));
 }
 
 export function gamesFor(state, playerId, group = null) {
-  return currentSession(state).games.filter(game => game.lineup.some(slot => slot.playerId === playerId && (group === null || roleGroup(slot.role) === group))).length;
+  return currentSession(state).games.filter(game => game.lineup.some(slot => slot.playerId === playerId && (group === null || slotGroup(slot.slot) === group))).length;
 }
 
 export function preferredGamesFor(state, playerId, includeActive = true) {
   const roles = state.players.find(player => player.id === playerId)?.roles || [];
   const session = currentSession(state);
-  return [...session.games, ...(includeActive && session.activeGame ? [session.activeGame] : [])].filter(game => game.lineup.some(slot => slot.playerId === playerId && roles.includes(slot.role))).length;
+  return [...session.games, ...(includeActive && session.activeGame ? [session.activeGame] : [])].filter(game => game.lineup.some(slot => slot.playerId === playerId && rolesInclude(roles, slot.roles))).length;
 }
 
 export function sortedAttendees(state) {
@@ -230,19 +243,19 @@ export function playableRoles(player) {
 }
 
 function autofillCandidates(state) {
-  const lineup = { ...currentSession(state).lineup };
-  const fixed = ROLES.map(role => lineup[role]).filter(Boolean);
+  const lineup = structuredClone(currentSession(state).lineup);
+  const fixed = SLOTS.map(role => lineup[role].playerId).filter(Boolean);
   if (new Set(fixed).size !== fixed.length || fixed.some(id => !state.players.some(player => player.id === id))) throw new Error('Check the selected players before autofilling.');
-  const emptyRoles = ROLES.filter(role => !lineup[role]);
+  const emptyRoles = SLOTS.filter(role => !lineup[role].playerId);
   const present = new Set(currentSession(state).attendees.filter(attendee => attendee.present).map(attendee => attendee.playerId));
-  const candidates = state.players.filter(player => present.has(player.id) && !fixed.includes(player.id) && emptyRoles.some(role => playableRoles(player).includes(role)));
+  const candidates = state.players.filter(player => present.has(player.id) && !fixed.includes(player.id) && emptyRoles.some(role => rolesInclude(playableRoles(player), playedRoles(currentSession(state), role, player))));
   const fullMask = (1 << emptyRoles.length) - 1;
   const subsets = Array.from({ length: fullMask }, (_, index) => index + 1).map(mask => ({ mask, roles: emptyRoles.filter((_, index) => mask & (1 << index)) })).sort((first, second) => first.roles.length - second.roles.length);
   for (const { roles } of subsets) {
-    const available = candidates.filter(player => roles.some(role => playableRoles(player).includes(role))).length;
+    const available = candidates.filter(player => roles.some(role => rolesInclude(playableRoles(player), playedRoles(currentSession(state), role, player)))).length;
     if (available < roles.length) {
-      if (roles.length === 1) throw new Error(`No available present player for ${roles[0]}.`);
-      throw new Error(`${roles.join(' / ')} need ${roles.length} different players; only ${available} eligible ${available === 1 ? 'player is' : 'players are'} available.`);
+      if (roles.length === 1) throw new Error(`No available present player for ${slotRoles(currentSession(state), roles[0]).join(' / ')}.`);
+      throw new Error(`${roles.map(slot => slotRoles(currentSession(state), slot).join(' / ')).join(' / ')} need ${roles.length} different players; only ${available} eligible ${available === 1 ? 'player is' : 'players are'} available.`);
     }
   }
   return { lineup, emptyRoles, candidates, fullMask };
@@ -272,13 +285,16 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
   const { lineup, emptyRoles, candidates, fullMask } = autofillCandidates(state);
   if (!emptyRoles.length) return lineup;
   const history = [...currentSession(state).games, ...(currentSession(state).activeGame ? [currentSession(state).activeGame] : [])];
-  const counts = new Map(candidates.map(player => [player.id, { total: 0, fills: 0, mainRoles: new Set(player.roles), roles: Object.fromEntries(ROLES.map(role => [role, 0])) }]));
+  const counts = new Map(candidates.map(player => [player.id, { total: 0, fills: 0, mainRoles: player.roles, groups: { tank: 0, dps: 0, support: 0 }, roles: Object.fromEntries(ROLES.map(role => [role, 0])) }]));
   for (const game of history) {
     for (const slot of game.lineup) {
       const count = counts.get(slot.playerId);
       if (count) {
-        if (count.mainRoles.has(slot.role)) { count.total += 1; count.roles[slot.role] += 1; }
-        else count.fills += 1;
+        if (rolesInclude(count.mainRoles, slot.roles)) {
+          count.total += 1;
+          count.groups[slotGroup(slot.slot)] += 1;
+          if (slot.roles.length === 1) count.roles[slot.roles[0]] += 1;
+        } else if (slot.roles.every(role => !count.mainRoles.includes(role))) count.fills += 1;
       }
     }
   }
@@ -297,16 +313,17 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
   const scores = new Map(candidates.map(player => {
     const count = counts.get(player.id);
     const groups = [...new Set(player.roles.map(roleGroup))];
-    const groupCounts = groups.map(group => ROLES.filter(role => roleGroup(role) === group).reduce((sum, role) => sum + count.roles[role], 0));
-    return [player.id, emptyRoles.map(role => {
-      if (!playableRoles(player).includes(role)) return null;
-      if (!player.roles.includes(role)) return [0n, 0n, 0, -(count.fills + 1), 0];
-      const group = roleGroup(role);
+    const groupCounts = groups.map(group => count.groups[group]);
+    return [player.id, emptyRoles.map(slot => {
+      const roles = playedRoles(currentSession(state), slot, player);
+      if (!rolesInclude(playableRoles(player), roles)) return null;
+      if (!rolesInclude(player.roles, roles)) return [0n, 0n, 0, -(count.fills + 1), 0];
+      const group = slotGroup(slot);
       const subroles = ROLES.filter(subrole => roleGroup(subrole) === group && player.roles.includes(subrole));
       const priority = priorities.get(player.id);
       const unweighted = denominator / BigInt(count.total + 1);
       const weighted = denominator * BigInt(priority.numerator) / (BigInt(count.total + 1) * BigInt(priority.denominator));
-      return [weighted, unweighted, roleDeficit(groupCounts, groups.indexOf(group)), 0, roleDeficit(subroles.map(subrole => count.roles[subrole]), subroles.indexOf(role))];
+      return [weighted, unweighted, roleDeficit(groupCounts, groups.indexOf(group)), 0, roles.length === 1 ? roleDeficit(subroles.map(subrole => count.roles[subrole]), subroles.indexOf(roles[0])) : 0];
     })];
   }));
   const compare = (first, second) => {
@@ -327,7 +344,7 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
         const existing = next.get(nextMask);
         const comparison = existing ? compare(score, existing.score) : 1;
         if (comparison < 0) return;
-        const proposal = { score, ways: option.ways, lineup: { ...option.lineup, [role]: player.id } };
+        const proposal = { score, ways: option.ways, lineup: { ...option.lineup, [role]: { ...option.lineup[role], playerId: player.id } } };
         if (comparison > 0) next.set(nextMask, proposal);
         else {
           const ways = existing.ways + proposal.ways;
@@ -344,29 +361,29 @@ export function autofillLineup(state, chooseRandom = randomBelow) {
 export function assignmentChoices(state, playerId) {
   const player = state.players.find(person => person.id === playerId);
   if (!player || !currentSession(state).attendees.some(attendee => attendee.playerId === playerId)) return [];
-  const roles = ROLES.filter(role => player.roles.includes(role));
-  const current = roles.find(role => currentSession(state).lineup[role] === playerId);
+  const roles = SLOTS.filter(role => rolesInclude(player.roles, playedRoles(currentSession(state), role, player)));
+  const current = roles.find(role => currentSession(state).lineup[role].playerId === playerId);
   if (current) return [current];
   if (roles.length <= 1) return roles;
-  const open = roles.filter(role => !currentSession(state).lineup[role]);
+  const open = roles.filter(role => !currentSession(state).lineup[role].playerId);
   return open.length ? open : roles;
 }
 
 export function assignPlayer(state, role, playerId, allowOffRole = false) {
-  if (!ROLES.includes(role)) return;
+  if (!SLOTS.includes(role)) return;
   if (playerId && !currentSession(state).attendees.some(attendee => attendee.playerId === playerId)) return;
-  if (playerId && !state.players.some(player => player.id === playerId && (allowOffRole || player.roles.includes(role)))) return;
-  for (const otherRole of ROLES) {
-    if (playerId && currentSession(state).lineup[otherRole] === playerId) currentSession(state).lineup[otherRole] = '';
+  if (playerId && !state.players.some(player => player.id === playerId && (allowOffRole || rolesInclude(player.roles, playedRoles(currentSession(state), role, player))))) return;
+  for (const otherRole of SLOTS) {
+    if (playerId && currentSession(state).lineup[otherRole].playerId === playerId) currentSession(state).lineup[otherRole].playerId = '';
   }
-  currentSession(state).lineup[role] = playerId;
+  currentSession(state).lineup[role].playerId = playerId;
 }
 
 export function swapPlayers(state, firstId, secondId) {
   if (![firstId, secondId].every(playerId => state.players.some(player => player.id === playerId) && currentSession(state).attendees.some(attendee => attendee.playerId === playerId))) throw new Error('Both players must be signed up.');
-  for (const role of ROLES) {
-    if (currentSession(state).lineup[role] === firstId) currentSession(state).lineup[role] = secondId;
-    else if (currentSession(state).lineup[role] === secondId) currentSession(state).lineup[role] = firstId;
+  for (const role of SLOTS) {
+    if (currentSession(state).lineup[role].playerId === firstId) currentSession(state).lineup[role].playerId = secondId;
+    else if (currentSession(state).lineup[role].playerId === secondId) currentSession(state).lineup[role].playerId = firstId;
   }
 }
 
@@ -374,15 +391,15 @@ export function removeAttendee(state, playerId, scrimId = state.activeScrimId) {
   const session = state.scrims.find(scrim => scrim.id === scrimId)?.session;
   if (!session) return;
   session.attendees = session.attendees.filter(attendee => attendee.playerId !== playerId);
-  for (const role of ROLES) if (session.lineup[role] === playerId) session.lineup[role] = '';
+  for (const role of SLOTS) if (session.lineup[role].playerId === playerId) session.lineup[role].playerId = '';
 }
 
 export function lineupStatus(state) {
-  const selected = ROLES.map(role => currentSession(state).lineup[role]).filter(Boolean);
+  const selected = SLOTS.map(role => currentSession(state).lineup[role].playerId).filter(Boolean);
   const absent = selected.filter(playerId => !currentSession(state).attendees.find(attendee => attendee.playerId === playerId)?.present);
-  const offRole = ROLES.filter(role => {
-    const player = state.players.find(person => person.id === currentSession(state).lineup[role]);
-    return player && !player.roles.includes(role);
+  const offRole = SLOTS.filter(role => {
+    const player = state.players.find(person => person.id === currentSession(state).lineup[role].playerId);
+    return player && !rolesInclude(player.roles, playedRoles(currentSession(state), role, player));
   });
   return { filled: selected.length, absent, offRole, ready: selected.length === 5 && new Set(selected).size === 5 && absent.length === 0 };
 }
@@ -390,16 +407,16 @@ export function lineupStatus(state) {
 function captureGame(state, id, playedAt) {
   if (currentSession(state).finished) throw new Error('Reopen the scrim before starting another game.');
   if (!lineupStatus(state).ready) throw new Error('Choose five different players and mark them all present first.');
-  const lineup = ROLES.map(role => {
-    const player = state.players.find(person => person.id === currentSession(state).lineup[role]);
-    return { role, playerId: player.id, name: player.name, battletag: player.battletag };
+  const lineup = SLOTS.map(role => {
+    const player = state.players.find(person => person.id === currentSession(state).lineup[role].playerId);
+    return { slot: role, roles: playedRoles(currentSession(state), role, player), playerId: player.id, name: player.name, battletag: player.battletag };
   });
   return { id, ...gameDetails(currentSession(state).draft), ...(currentSession(state).bansEnabled === false ? { ourBan: null, theirBan: null } : {}), outcome: '', playedAt, lineup };
 }
 
 export function startGame(state, id, startedAt, markPresent = false) {
   if (currentSession(state).activeGame) throw new Error('Finish the current game first.');
-  const selected = new Set(Object.values(currentSession(state).lineup));
+  const selected = new Set(Object.values(currentSession(state).lineup).map(slot => slot.playerId));
   const attendees = markPresent ? currentSession(state).attendees.map(attendee => ({ ...attendee, present: attendee.present || selected.has(attendee.playerId) })) : currentSession(state).attendees;
   const game = captureGame({ ...state, scrims: state.scrims.map(scrim => scrim.id === state.activeScrimId ? { ...scrim, session: { ...scrim.session, attendees } } : scrim) }, id, startedAt);
   currentSession(state).attendees = attendees;
@@ -427,28 +444,33 @@ export function cancelActiveGame(state) {
   const game = currentSession(state).activeGame;
   if (Object.values(currentSession(state).draft).some(Boolean)) throw new Error('Clear the upcoming map and bans before returning this game to upcoming.');
   currentSession(state).draft = gameDetails(game);
-  for (const role of ROLES) {
-    const slot = game.lineup.find(slot => slot.role === role);
-    currentSession(state).lineup[role] = currentSession(state).attendees.some(attendee => attendee.playerId === slot.playerId) ? slot.playerId : '';
+  for (const snapshot of game.lineup) {
+    setSlotRoles(state, snapshot.slot, snapshot.roles);
+    currentSession(state).lineup[snapshot.slot].playerId = currentSession(state).attendees.some(attendee => attendee.playerId === snapshot.playerId) ? snapshot.playerId : '';
   }
   currentSession(state).activeGame = null;
 }
 
 export function replaceGamePlayer(state, game, role, playerId) {
-  if (!ROLES.includes(role)) throw new Error('Unknown role.');
-  const target = game.lineup.find(slot => slot.role === role);
+  const target = game.lineup.find(slot => slot.slot === role);
   if (!target) throw new Error('Missing game slot.');
   const existing = game.lineup.find(slot => slot.playerId === playerId);
   if (existing) {
-    const previousRole = existing.role;
-    existing.role = role;
-    target.role = previousRole;
+    const snapshot = ({ playerId, name, battletag }) => ({ playerId, name, battletag });
+    const previous = snapshot(target);
+    Object.assign(target, snapshot(existing));
+    Object.assign(existing, previous);
   } else {
     const player = state.players.find(player => player.id === playerId);
     if (!player) throw new Error('Player not found.');
     Object.assign(target, { playerId, name: player.name, battletag: player.battletag });
   }
-  game.lineup.sort((first, second) => ROLES.indexOf(first.role) - ROLES.indexOf(second.role));
+}
+
+export function setGameRoles(game, slotId, roles) {
+  const snapshot = game.lineup.find(slot => slot.slot === slotId);
+  if (!snapshot || !validSlotRoles(slotId, roles)) throw new Error('Choose roles in the same role group.');
+  snapshot.roles = ROLES.filter(role => roles.includes(role));
 }
 
 export function recordGame(state, id, playedAt) {

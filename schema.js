@@ -1,3 +1,5 @@
+import { ROLES, SLOTS, validSlotRoles } from './roles.js';
+export { ROLES } from './roles.js';
 export const PRIORITIES = [
   { value: '1/5', label: '⅕×', numerator: 1, denominator: 5 },
   { value: '1/4', label: '¼×', numerator: 1, denominator: 4 },
@@ -30,7 +32,6 @@ export function validateStatus(status) {
   }
 }
 
-export const ROLES = ['Tank', 'HSDPS', 'FDPS', 'MS', 'FS'];
 export const MODES = ['Control', 'Push', 'Hybrid', 'Escort', 'Flashpoint'];
 export const OUTCOMES = ['win', 'loss', 'draw'];
 
@@ -76,15 +77,20 @@ export function validateState(input) {
       if (!fields(attendee, ['playerId', 'present', 'priority']) || !playerIds.has(attendee.playerId) || typeof attendee.present !== 'boolean' || !PRIORITIES.some(priority => priority.value === attendee.priority)) fail();
     }
     const attendeeIds = session.attendees.map(attendee => attendee.playerId);
-    if (!unique(attendeeIds) || !fields(session.lineup, ROLES) || !ROLES.every(role => session.lineup[role] === '' || attendeeIds.includes(session.lineup[role])) || !unique(Object.values(session.lineup).filter(Boolean))) fail();
+    if (!unique(attendeeIds) || !fields(session.lineup, SLOTS)) fail();
+    for (const slot of SLOTS) {
+      const entry = session.lineup[slot];
+      if (!fields(entry, ['allowedRoles', 'playerId']) || !validSlotRoles(slot, entry.allowedRoles) || (entry.playerId !== '' && !attendeeIds.includes(entry.playerId))) fail();
+    }
+    if (!unique(Object.values(session.lineup).map(slot => slot.playerId).filter(Boolean))) fail();
     if (session.activeGame !== null && !object(session.activeGame)) fail();
     for (const game of [...session.games, ...(session.activeGame ? [session.activeGame] : [])]) {
       const keys = ['id', 'map', 'mode', 'ourBan', 'theirBan', 'outcome', 'playedAt', 'lineup', ...(Object.hasOwn(game || {}, 'startedAt') ? ['startedAt'] : [])];
       if (!fields(game, keys) || !identifier(game.id) || !details(game) || !date(game.playedAt) || (game.startedAt !== undefined && !date(game.startedAt)) || (game.outcome !== '' && !OUTCOMES.includes(game.outcome)) || !list(game.lineup, 5) || game.lineup.length !== 5) fail();
       for (const slot of game.lineup) {
-        if (!fields(slot, ['role', 'playerId', 'name', 'battletag']) || !ROLES.includes(slot.role) || !identifier(slot.playerId) || !string(slot.name, 80) || !slot.name.trim() || !string(slot.battletag)) fail();
+        if (!fields(slot, ['slot', 'roles', 'playerId', 'name', 'battletag']) || !validSlotRoles(slot.slot, slot.roles) || !identifier(slot.playerId) || !string(slot.name, 80) || !slot.name.trim() || !string(slot.battletag)) fail();
       }
-      if (!unique(game.lineup.map(slot => slot.role)) || !unique(game.lineup.map(slot => slot.playerId))) fail();
+      if (!unique(game.lineup.map(slot => slot.slot)) || !unique(game.lineup.map(slot => slot.playerId))) fail();
     }
     if (!unique(session.games.map(game => game.id)) || (session.activeGame && (!date(session.activeGame.startedAt) || session.games.some(game => game.id === session.activeGame.id)))) fail();
   }

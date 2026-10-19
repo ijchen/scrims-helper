@@ -1,3 +1,4 @@
+import { defaultSlot, snapshotRole } from './fixtures.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newState, currentSession, preferredGamesFor, gamesFor } from '../model.js';
@@ -6,12 +7,12 @@ test('preferred counts include active mains, exclude fills, and follow current p
   const state = newState();
   state.players.push({ id: 'player', name: 'Player', battletag: '', roles: ['MS'], offRoles: ['FS'], status: 'default', notes: '' });
   const session = currentSession(state);
-  session.games = ['MS', 'FS', 'Tank'].map(role => ({ lineup: [{ playerId: 'player', role }] }));
+  session.games = ['MS', 'FS', 'Tank'].map(role => ({ lineup: [{ playerId: 'player', ...snapshotRole(role) }] }));
   assert.equal(preferredGamesFor(state, 'player'), 1);
   assert.equal(gamesFor(state, 'player'), 3);
-  session.activeGame = { lineup: [{ playerId: 'player', role: 'FS' }] };
+  session.activeGame = { lineup: [{ playerId: 'player', ...snapshotRole('FS') }] };
   assert.equal(preferredGamesFor(state, 'player'), 1);
-  session.activeGame.lineup[0].role = 'MS';
+  session.activeGame.lineup[0].roles = ['MS'];
   assert.equal(preferredGamesFor(state, 'player'), 2);
   assert.equal(preferredGamesFor(state, 'player', false), 1);
   state.players[0].roles.push('FS');

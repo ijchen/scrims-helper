@@ -1,3 +1,4 @@
+import { defaultSlot, snapshotRole } from './fixtures.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newState, currentSession, createScrim, switchScrim, ROLES, recordGame, gameWarnings, validateState } from '../model.js';
@@ -29,7 +30,7 @@ test('disabled bans do not enter new games or warnings and do not erase history'
   for (const role of ROLES) {
     state.players.push({ id: role, name: role, roles: [role], battletag: '', status: 'default', notes: '' });
     session.attendees.push({ playerId: role, present: true, priority: '1' });
-    session.lineup[role] = role;
+    session.lineup[defaultSlot(role)].playerId = role;
   }
   session.draft.ourBan = heroRef('Ana');
   session.draft.theirBan = heroRef('Mercy');

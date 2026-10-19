@@ -1,3 +1,4 @@
+import { defaultSlot, snapshotRole } from './fixtures.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newState, currentSession, ROLES, PRIORITIES, autofillLineup, setPlayerPriority, createScrim, removeAttendee, validateState, newAttendee } from '../model.js';
@@ -8,7 +9,7 @@ function fixture() {
   for (const role of ROLES.slice(1)) {
     state.players.push({ id: role, name: role, roles: [role], status: 'default', notes: '', battletag: '' });
     currentSession(state).attendees.push({ playerId: role, present: true, priority: '1' });
-    currentSession(state).lineup[role] = role;
+    currentSession(state).lineup[defaultSlot(role)].playerId = role;
   }
   return state;
 }
@@ -19,7 +20,7 @@ function add(state, id, games, priority = '1', status = 'default') {
   setPlayerPriority(state, id, priority);
   for (let index = 0; index < games; index++) {
     currentSession(state).games[index] ??= { lineup: [] };
-    currentSession(state).games[index].lineup.push({ role: 'Tank', playerId: id });
+    currentSession(state).games[index].lineup.push({ ...snapshotRole('Tank'), playerId: id });
   }
 }
 
@@ -27,16 +28,16 @@ test('priority can favor more-played players; exact weighted ties use unweighted
   const state = fixture();
   add(state, 'boosted', 3, '2', 'trial');
   add(state, 'regular', 2);
-  assert.equal(autofillLineup(state).Tank, 'boosted');
+  assert.equal(autofillLineup(state).tank.playerId, 'boosted');
   currentSession(state).games[1].lineup = currentSession(state).games[1].lineup.filter(slot => slot.playerId !== 'regular');
-  assert.equal(autofillLineup(state).Tank, 'regular');
+  assert.equal(autofillLineup(state).tank.playerId, 'regular');
 });
 
 test('reciprocal priorities tie exactly without floating point', () => {
   const state = fixture();
   add(state, 'third', 2, '1/3');
   add(state, 'normal', 8, '1', 'trial');
-  assert.equal(autofillLineup(state).Tank, 'third');
+  assert.equal(autofillLineup(state).tank.playerId, 'third');
 });
 
 test('intermediate priorities retain exact ties and survive export', () => {
@@ -44,7 +45,7 @@ test('intermediate priorities retain exact ties and survive export', () => {
     const state = fixture();
     add(state, 'intermediate', games, value);
     add(state, 'normal', otherGames);
-    assert.equal(autofillLineup(state).Tank, games < otherGames ? 'intermediate' : 'normal');
+    assert.equal(autofillLineup(state).tank.playerId, games < otherGames ? 'intermediate' : 'normal');
     currentSession(state).games = [];
     assert.doesNotThrow(() => validateState(state));
     assert.equal(readImport(exportData(state, { players: true, scrims: true })).scrims.items[0].session.attendees.find(attendee => attendee.playerId === 'intermediate').priority, value);
@@ -55,9 +56,9 @@ test('weighted fairness includes an in-progress preferred game immediately', () 
   const state = fixture();
   add(state, 'boosted', 2, '2');
   add(state, 'regular', 1);
-  assert.equal(autofillLineup(state).Tank, 'boosted');
-  currentSession(state).activeGame = { lineup: [{ role: 'Tank', playerId: 'boosted' }] };
-  assert.equal(autofillLineup(state).Tank, 'regular');
+  assert.equal(autofillLineup(state).tank.playerId, 'boosted');
+  currentSession(state).activeGame = { lineup: [{ ...snapshotRole('Tank'), playerId: 'boosted' }] };
+  assert.equal(autofillLineup(state).tank.playerId, 'regular');
 });
 
 test('common scaling preserves rankings and exact randomized ties', () => {
@@ -72,8 +73,8 @@ test('common scaling preserves rankings and exact randomized ties', () => {
   for (const value of ['1', '5']) {
     setPlayerPriority(state, 'first', value);
     setPlayerPriority(state, 'second', value);
-    assert.equal(autofillLineup(state, () => 0n).Tank, 'second');
-    assert.equal(autofillLineup(state, limit => limit - 1n).Tank, 'first');
+    assert.equal(autofillLineup(state, () => 0n).tank.playerId, 'second');
+    assert.equal(autofillLineup(state, limit => limit - 1n).tank.playerId, 'first');
   }
 });
 
@@ -103,7 +104,7 @@ test('fills earn no weighted benefit, including high-priority trials', () => {
   add(state, 'fill', 0, '5', 'trial');
   state.players.at(-1).roles = [];
   state.players.at(-1).offRoles = ['Tank'];
-  assert.equal(autofillLineup(state).Tank, 'main');
+  assert.equal(autofillLineup(state).tank.playerId, 'main');
 });
 
 test('weighted optimizer agrees with independent exact rational enumeration', () => {
@@ -124,11 +125,11 @@ test('weighted optimizer agrees with independent exact rational enumeration', ()
       state.players.at(-1).roles = ROLES.filter((role, roleIndex) => (index + roleIndex + scenario) % 3 !== 0);
       for (const game of currentSession(state).games) {
         const slot = game.lineup.find(slot => slot.playerId === id);
-        if (slot) slot.role = state.players.at(-1).roles[0];
+        if (slot) Object.assign(slot, snapshotRole(state.players.at(-1).roles[0]));
       }
       counts.set(id, games);
     }
-    const score = lineup => Object.values(lineup).reduce((total, id) => {
+    const score = lineup => Object.values(lineup).map(slot => slot.playerId).reduce((total, id) => {
       const priority = PRIORITIES.find(option => option.value === currentSession(state).attendees.find(attendee => attendee.playerId === id).priority);
       return [addFraction(total[0], [BigInt(priority.numerator), BigInt(priority.denominator * (counts.get(id) + 1))]), addFraction(total[1], [1n, BigInt(counts.get(id) + 1)])];
     }, [[0n, 1n], [0n, 1n]]);
@@ -140,7 +141,7 @@ test('weighted optimizer agrees with independent exact rational enumeration', ()
         return;
       }
       for (const player of state.players) {
-        if (!used.includes(player.id) && player.roles.includes(ROLES[index])) enumerate({ ...lineup, [ROLES[index]]: player.id }, [...used, player.id], index + 1);
+        if (!used.includes(player.id) && player.roles.includes(ROLES[index])) enumerate({ ...lineup, [defaultSlot(ROLES[index])]: { allowedRoles: [ROLES[index]], playerId: player.id } }, [...used, player.id], index + 1);
       }
     }
     enumerate({}, [], 0);

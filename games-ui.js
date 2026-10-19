@@ -2,7 +2,7 @@ import { uiIcon } from './icons.js';
 import { MAPS, HEROES } from './catalog.js';
 import { findCatalogItem, searchCatalog } from './search.js';
 import { catalogItem, catalogReference, referenceName } from './catalog-references.js';
-import { currentSession, setScrimFinished, ROLES, MODES, OUTCOMES, modeRotation, gameWarnings, roleGroup, lineupStatus, replaceGamePlayer, setGameOutcome, enabledMaps, saveMapPoolPreset, loadMapPoolPreset, renameMapPoolPreset } from './model.js';
+import { currentSession, SLOTS, slotGroup, roleLabel, setGameRoles, playedRoles, setScrimFinished, ROLES, MODES, OUTCOMES, modeRotation, gameWarnings, roleGroup, lineupStatus, replaceGamePlayer, setGameOutcome, enabledMaps, saveMapPoolPreset, loadMapPoolPreset, renameMapPoolPreset } from './model.js';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const element = id => document.getElementById(id);
@@ -106,9 +106,9 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
   element('map-pool-none').onclick = () => setAllMaps(false);
   const getGame = id => {
     const session = currentSession(getState());
-    if (!id) return { ...session.draft, lineup: ROLES.map(role => {
-      const player = getState().players.find(player => player.id === session.lineup[role]);
-      return { role, playerId: player?.id || '', name: player?.name || 'Empty' };
+    if (!id) return { ...session.draft, lineup: SLOTS.map(role => {
+      const player = getState().players.find(player => player.id === session.lineup[role].playerId);
+      return { slot: role, roles: playedRoles(session, role, player), playerId: player?.id || '', name: player?.name || 'Empty' };
     }) };
     return session.activeGame?.id === id ? session.activeGame : session.games.find(game => game.id === id);
   };
@@ -179,7 +179,7 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
           <div class="game-card-actions">${status === 'live' ? '<button class="quiet" data-game-action="cancel">Back to upcoming</button>' : status === 'upcoming' ? `${readiness.absent.length ? `<span class="attendance-warning">${readiness.absent.length} not marked here</span>` : ''}<button class="primary" data-game-action="start" ${session.activeGame || readiness.filled < 5 ? 'disabled' : ''} title="${session.activeGame ? 'Finish the current game first' : readiness.filled < 5 ? 'Choose a player for all five slots first' : readiness.absent.length ? 'Confirm attendance and start the game' : 'Capture these five players and start the game'}">Start game</button>` : ''}${status === 'upcoming' ? '' : `<button class="quiet" data-edit-game="${escapeHtml(id)}" aria-label="Edit Game ${number}">Edit</button>`}</div>
         </header>
         <div class="game-card-content"><div class="game-map-settings">${mapButton(game, id)}${status === 'upcoming' && referenceName(game.map).trim() && !catalogItem(MAPS, game.map) ? `<label class="field custom-mode-field">Map mode<select id="upcoming-map-mode"><option value="">Choose mode</option>${MODES.map(mode => `<option ${game.mode === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label>` : ''}</div><div class="game-card-details"><div class="game-bans">${banButton(game, 'ourBan', id)}${banButton(game, 'theirBan', id)}</div>
-        <div class="game-lineup" aria-label="Game ${number} players">${game.lineup.map(slot => `<span class="game-player" title="${escapeHtml(slot.role)}: ${escapeHtml(slot.name)}"><span class="${roleGroup(slot.role)}">${roleIcon(roleGroup(slot.role))}<small>${slot.role}</small></span><strong>${escapeHtml(slot.name)}</strong></span>`).join('')}</div></div></div>
+        <div class="game-lineup" aria-label="Game ${number} players">${game.lineup.map(slot => `<span class="game-player" title="${escapeHtml(roleLabel(slot.roles))}: ${escapeHtml(slot.name)}"><span class="${slotGroup(slot.slot)}">${roleIcon(slotGroup(slot.slot))}<small>${roleLabel(slot.roles)}</small></span><strong>${escapeHtml(slot.name)}</strong></span>`).join('')}</div></div></div>
         ${status === 'upcoming' ? '' : status === 'live' ? `<div class="game-outcome">${finishControls()}</div>` : outcomeControls(game)}
       </article>`;
     element('game-overview').hidden = session.games.length === 0;
@@ -362,15 +362,27 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     element('reopen-game').hidden = !editingId || Boolean(currentSession(state).activeGame) || currentSession(state).games.at(-1)?.id !== editingId;
     element('game-editor-heading').textContent = editingId ? isActive ? 'Edit in-progress game' : `Edit Game ${currentSession(state).games.findIndex(item => item.id === editingId) + 1}` : 'Upcoming game';
     element('game-editor-fields').innerHTML = `<div class="editor-media">${mapButton(game, editingId)}<div class="game-bans">${banButton(game, 'ourBan', editingId)}${banButton(game, 'theirBan', editingId)}</div></div>${editingId ? outcomeControls(game) : ''}${map ? '' : `<label class="field">Mode (custom map)<select id="custom-map-mode"><option value="">Not set</option>${MODES.map(mode => `<option ${game.mode === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label>`}`;
+    const attendeeIds = new Set(currentSession(state).attendees.map(attendee => attendee.playerId));
     element('game-editor-roster').innerHTML = editingId ? game.lineup.map(slot => {
       const options = new Map(game.lineup.map(item => [item.playerId, item.name]));
-      for (const player of state.players) options.set(player.id, player.name);
-      return `<label class="recorded-slot"><span class="${roleGroup(slot.role)}">${roleIcon(roleGroup(slot.role))}${slot.role}</span><select data-recorded-role="${slot.role}" aria-label="Recorded ${slot.role} player">${[...options].sort((first, second) => first[1].localeCompare(second[1])).map(([id, name]) => `<option value="${escapeHtml(id)}" ${id === slot.playerId ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select></label>`;
+      for (const player of state.players) {
+        if (attendeeIds.has(player.id)) options.set(player.id, player.name);
+      }
+      const groupRoles = ROLES.filter(role => roleGroup(role) === slotGroup(slot.slot));
+      const roleOptions = [...groupRoles.map(role => [role]), ...(groupRoles.length > 1 ? [groupRoles] : [])];
+      return `<div class="recorded-slot"><span class="${slotGroup(slot.slot)}">${roleIcon(slotGroup(slot.slot))}${slot.slot === 'tank' ? 'Tank' : `<select data-recorded-subrole="${slot.slot}" aria-label="Role played by ${escapeHtml(slot.name)}">${roleOptions.map(roles => `<option value="${roles.join(',')}" ${roles.length === slot.roles.length && roles.every(role => slot.roles.includes(role)) ? 'selected' : ''}>${roleLabel(roles)}</option>`).join('')}</select>`}</span><select data-recorded-role="${slot.slot}" aria-label="Recorded ${roleLabel(slot.roles)} player">${[...options].sort((first, second) => first[1].localeCompare(second[1])).map(([id, name]) => `<option value="${escapeHtml(id)}" ${id === slot.playerId ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select></div>`;
     }).join('') : '<p class="muted small">Use the lineup above to choose the next five.</p>';
   }
 
   editor.addEventListener('change', event => {
     if (event.target.id === 'custom-map-mode') updateField(editingId, 'mode', event.target.value);
+    if (event.target.dataset.recordedSubrole !== undefined) {
+      const slotId = event.target.dataset.recordedSubrole;
+      setGameRoles(getGame(editingId), slotId, event.target.value.split(','));
+      save();
+      renderEditor();
+      editor.querySelector(`[data-recorded-subrole="${slotId}"]`)?.focus();
+    }
     if (event.target.dataset.recordedRole) {
       const role = event.target.dataset.recordedRole;
       replaceGamePlayer(getState(), getGame(editingId), role, event.target.value);

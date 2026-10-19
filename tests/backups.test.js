@@ -64,7 +64,7 @@ test('omitted and skipped categories survive, while included blank code resets',
 });
 
 test('malformed partial files, dangling references, preferences and duplicate IDs fail safely', () => {
-  const wrap = data => ({ format: 'scrims-helper-export', version: 1, schema: 'scrims-helper-v1', data });
+  const wrap = data => ({ format: 'scrims-helper-export', version: 1, data });
   for (const data of [{ players: null }, { preferences: { theme: 'neon' } }, { preferences: { panelSplit: 99 } }, { customGameCode: null }, { surprise: true }, {}]) assert.throws(() => readImport(wrap(data)));
   const state = newState();
   currentSession(state).attendees = [{ playerId: 'missing', present: true, priority: '1' }];

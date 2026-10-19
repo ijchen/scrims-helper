@@ -1,7 +1,7 @@
 import { uiIcon } from './icons.js';
-import { ROLES, STORAGE_KEY, emptyLineup, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, lineupSwaps, autofillLineup, startGame, finishGame, reopenLastGame, cancelActiveGame } from './model.js';
+import { ROLES, SLOTS, slotGroup, roleLabel, rolesInclude, slotRoles, playedRoles, setSlotRoles, STORAGE_KEY, newState, gamesFor, roleGroup, assignPlayer, swapPlayers, assignmentChoices, removeAttendee, lineupStatus, lineupSwaps, autofillLineup, startGame, finishGame, reopenLastGame, cancelActiveGame } from './model.js';
 import { gameDetails, referenceName } from './catalog-references.js';
-import { defaultScrimTime, easternInput, fromEasternInput, scrimTimeLabel, discordTimestamp } from './scrim-time.js';
+import { defaultScrimTime, localInput, fromLocalInput, scrimTimeLabel, discordTimestamp } from './scrim-time.js';
 import { createGamesUI } from './games-ui.js';
 import { currentSession, currentScrim, gameCodeFor, allScrims, autofillUnavailableReason, playableRoles, sortedAttendees, PRIORITIES, setPlayerPriority, newAttendee } from './model.js';
 import { statusFor, effectivePriority, orderedStatuses, sortedDirectoryPlayers } from './statuses.js';
@@ -12,8 +12,9 @@ import { THEME_KEY, PANEL_SPLIT_KEY, BAR_LAYOUT_KEY, readSavedState, restoreSave
 
 const element = id => document.getElementById(id);
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+const slotLabel = slot => `${slotRoles(currentSession(state), slot).join(' / ')}${slot === 'tank' ? '' : ` · ${['dps1', 'support1'].includes(slot) ? 1 : 2}`}`;
 const roleNames = { Tank: 'Tank', HSDPS: 'Hitscan DPS', FDPS: 'Flex DPS', MS: 'Main support', FS: 'Flex support' };
-const roleBadges = (player, choices = []) => playableRoles(player).map(role => choices.includes(role) ? `<button class="role-chip role-choice ${roleGroup(role)}" data-choice-role="${role}" data-choice-player="${escapeHtml(player.id)}" aria-label="Play ${escapeHtml(player.name)} as ${role}">${role}</button>` : `<span data-role-chip="${role}" class="role-chip ${roleGroup(role)} ${player.roles.includes(role) ? '' : 'fill-role'}" title="${roleNames[role]} · ${player.roles.includes(role) ? 'Main' : 'Fill'}">${role}${player.roles.includes(role) ? '' : '<span class="fill-mark"> · Fill</span>'}</span>`).join('');
+const roleBadges = (player, choices = []) => playableRoles(player).map(role => choices.some(slot => slotRoles(currentSession(state), slot).includes(role)) ? `<button class="role-chip role-choice ${roleGroup(role)}" data-choice-role="${choices.find(slot => slotRoles(currentSession(state), slot).includes(role))}" data-choice-player="${escapeHtml(player.id)}" aria-label="Assign ${escapeHtml(player.name)} to ${slotLabel(choices.find(slot => slotRoles(currentSession(state), slot).includes(role)))}">${role}</button>` : `<span data-role-chip="${role}" class="role-chip ${roleGroup(role)} ${player.roles.includes(role) ? '' : 'fill-role'}" title="${roleNames[role]} · ${player.roles.includes(role) ? 'Main' : 'Fill'}">${role}${player.roles.includes(role) ? '' : '<span class="fill-mark"> · Fill</span>'}</span>`).join('');
 const statusBadge = player => {
   const status = statusFor(state, player);
   return status.showBadge ? `<span class="status-badge" style="--status-color:${status.color}">${escapeHtml(status.name)}</span>` : '';
@@ -237,22 +238,25 @@ function gameBar(player, label, className, group = null) {
   const capacity = Math.max(5, timeline.length);
   let preferred = 0;
   let fills = 0;
+  let unknown = 0;
   let inProgress = false;
   const segments = Array.from({ length: capacity }, (_, index) => {
     const game = timeline[index];
     const slot = game?.lineup.find(slot => slot.playerId === player.id);
-    const played = slot && (group === null || roleGroup(slot.role) === group);
-    const fill = played && !player.roles.includes(slot.role);
+    const played = slot && (group === null || slotGroup(slot.slot) === group);
+    const main = played && rolesInclude(player.roles, slot.roles);
+    const fill = played && slot.roles.every(role => !player.roles.includes(role));
+    const uncertain = played && !main && !fill;
     const active = played && index === session.games.length;
-    if (played && !active) { if (fill) fills += 1; else preferred += 1; }
+    if (played && !active) { if (fill) fills += 1; else if (uncertain) unknown += 1; else preferred += 1; }
     if (active) inProgress = true;
-    const description = `Game ${index + 1}: ${!game ? 'not started' : played ? `${slot.role} · ${fill ? 'fill' : 'preferred'}${active ? ' · in progress' : ''}` : slot ? `played ${slot.role}` : 'sat out'}`;
+    const description = `Game ${index + 1}: ${!game ? 'not started' : played ? `${roleLabel(slot.roles)} · ${uncertain ? 'main/fill unresolved' : fill ? 'fill' : 'preferred'}${active ? ' · in progress' : ''}` : slot ? `played ${roleLabel(slot.roles)}` : 'sat out'}`;
     const rank = played ? (fill ? 2 : 0) + Number(active) : game ? 4 : 5;
-    return { rank, html: `<span class="bar-segment ${played ? active ? 'in-progress' : 'filled' : ''} ${fill ? 'fill-game' : ''} ${game ? '' : 'future-game'}" title="${escapeHtml(description)}"></span>` };
+    return { rank, html: `<span class="bar-segment ${played ? active ? 'in-progress' : 'filled' : ''} ${uncertain ? 'unknown-game' : fill ? 'fill-game' : ''} ${game ? '' : 'future-game'}" title="${escapeHtml(description)}"></span>` };
   });
   if (barLayout === 'grouped') segments.sort((first, second) => first.rank - second.rank);
-  const count = preferred + fills;
-  const description = `${count} ${label} games · ${preferred} preferred, ${fills} fill${inProgress ? ' · 1 in progress' : ''}`;
+  const count = preferred + fills + unknown;
+  const description = `${count} ${label} games · ${preferred} preferred, ${fills} fill${unknown ? `, ${unknown} unresolved` : ''}${inProgress ? ' · 1 in progress' : ''}`;
   return `<span class="game-bar ${className}" aria-label="${description}"><small>${label}</small><span class="playtime-track" style="--segments:${capacity}" aria-hidden="true">${segments.map(segment => segment.html).join('')}</span><strong title="${description}">${count}</strong></span>`;
 }
 
@@ -309,22 +313,22 @@ window.addEventListener('resize', hideNotesPreview);
 
 function playerCard(attendee) {
   const player = playerById(attendee.playerId);
-  const assignedRole = ROLES.find(slot => currentSession(state).lineup[slot] === player.id);
-  const group = roleGroup(assignedRole) || roleGroup(player.roles[0]) || 'tank';
+  const assignedRole = SLOTS.find(slot => currentSession(state).lineup[slot]?.playerId === player.id);
+  const group = slotGroup(assignedRole) || roleGroup(player.roles[0]) || 'tank';
   const activeSlot = currentSession(state).activeGame?.lineup.find(slot => slot.playerId === player.id);
-  const activeGroup = roleGroup(activeSlot?.role);
-  const barGroups = ['tank', 'dps', 'support'].filter(barGroup => playableRoles(player).some(role => roleGroup(role) === barGroup) || roleGroup(assignedRole) === barGroup || activeGroup === barGroup || gamesFor(state, player.id, barGroup) > 0);
+  const activeGroup = slotGroup(activeSlot?.slot);
+  const barGroups = ['tank', 'dps', 'support'].filter(barGroup => playableRoles(player).some(role => roleGroup(role) === barGroup) || slotGroup(assignedRole) === barGroup || activeGroup === barGroup || gamesFor(state, player.id, barGroup) > 0);
   const groupLabels = { tank: 'tank', dps: 'DPS', support: 'supp' };
-  const offRole = assignedRole && !playableRoles(player).includes(assignedRole);
-  const filling = assignedRole && (player.offRoles || []).includes(assignedRole);
-  const option = role => `<option value="${role}" ${assignedRole === role ? 'selected' : ''}>${role}${player.roles.includes(role) ? '' : (player.offRoles || []).includes(role) ? ' (fill)' : ' (unlisted)'}</option>`;
-  const usual = ROLES.filter(role => player.roles.includes(role));
-  const fills = player.offRoles || [];
-  const unlisted = ROLES.filter(role => !playableRoles(player).includes(role));
+  const offRole = assignedRole && !rolesInclude(playableRoles(player), playedRoles(currentSession(state), assignedRole, player));
+  const filling = assignedRole && rolesInclude((player.offRoles || []), playedRoles(currentSession(state), assignedRole, player));
+  const option = role => `<option value="${role}" ${assignedRole === role ? 'selected' : ''}>${slotLabel(role)}${rolesInclude(player.roles, playedRoles(currentSession(state), role, player)) ? '' : rolesInclude((player.offRoles || []), playedRoles(currentSession(state), role, player)) ? ' (fill)' : ' (unlisted)'}</option>`;
+  const usual = SLOTS.filter(role => rolesInclude(player.roles, playedRoles(currentSession(state), role, player)));
+  const fills = SLOTS.filter(role => !usual.includes(role) && rolesInclude((player.offRoles || []), playedRoles(currentSession(state), role, player)));
+  const unlisted = SLOTS.filter(role => !usual.includes(role) && !fills.includes(role));
   const choices = choosingPlayerId === player.id ? assignmentChoices(state, player.id) : [];
   const priority = effectivePriority(state, attendee);
-  return `<article class="player-card roster-row ${roleGroup(assignedRole) || group} ${attendee.present ? '' : 'not-present'} ${assignedRole ? 'selected' : ''} ${offRole ? 'off-role' : ''} ${choices.length ? 'choosing' : ''}" data-player-card="${escapeHtml(player.id)}">
-    <div class="attendance-cell"><label class="attendance" title="${attendee.present ? 'Here' : 'Not here'}"><input type="checkbox" data-present="${escapeHtml(player.id)}" ${attendee.present ? 'checked' : ''} aria-label="${escapeHtml(player.name)} is present"><span aria-hidden="true">${uiIcon(attendee.present ? 'check' : 'minus')}</span></label>${assignedRole ? `<span class="lineup-badge ${roleGroup(assignedRole)} ${offRole ? 'unusual' : filling ? 'fill-assignment' : ''}" role="img" aria-label="Playing ${assignedRole}${offRole ? ' (unlisted)' : filling ? ' (fill)' : ''}" title="Playing ${assignedRole}${offRole ? ' (unlisted)' : filling ? ' (fill)' : ''}">${roleIcon(roleGroup(assignedRole))}${filling ? '<span class="fill-label">Fill</span>' : ''}${offRole ? `<span class="role-alert" aria-hidden="true">${uiIcon('alert', 10)}</span>` : ''}</span>` : ''}</div>
+  return `<article class="player-card roster-row ${slotGroup(assignedRole) || group} ${attendee.present ? '' : 'not-present'} ${assignedRole ? 'selected' : ''} ${offRole ? 'off-role' : ''} ${choices.length ? 'choosing' : ''}" data-player-card="${escapeHtml(player.id)}">
+    <div class="attendance-cell"><label class="attendance" title="${attendee.present ? 'Here' : 'Not here'}"><input type="checkbox" data-present="${escapeHtml(player.id)}" ${attendee.present ? 'checked' : ''} aria-label="${escapeHtml(player.name)} is present"><span aria-hidden="true">${uiIcon(attendee.present ? 'check' : 'minus')}</span></label>${assignedRole ? `<span class="lineup-badge ${slotGroup(assignedRole)} ${offRole ? 'unusual' : filling ? 'fill-assignment' : ''}" role="img" aria-label="Playing ${roleLabel(playedRoles(currentSession(state), assignedRole, player))}${offRole ? ' (unlisted)' : filling ? ' (fill)' : ''}" title="Playing ${roleLabel(playedRoles(currentSession(state), assignedRole, player))}${offRole ? ' (unlisted)' : filling ? ' (fill)' : ''}">${roleIcon(slotGroup(assignedRole))}${filling ? '<span class="fill-label">Fill</span>' : ''}${offRole ? `<span class="role-alert" aria-hidden="true">${uiIcon('alert', 10)}</span>` : ''}</span>` : ''}</div>
     <div class="player-info" draggable="true" data-pick-player="${escapeHtml(player.id)}" title="${escapeHtml(player.battletag)}">
       <div class="player-name-line"><button class="player-name-action" data-quick-assign="${escapeHtml(player.id)}" aria-label="Put ${escapeHtml(player.name)} in the lineup"><span class="card-name">${escapeHtml(player.name)} ${statusBadge(player)}${attendee.present ? '' : '<span class="away-badge">Not here</span>'}</span></button>${playerNotesButton(player)}<button class="player-priority ${priority.value !== statusFor(state, player).priority ? 'adjusted' : ''}" data-priority="${escapeHtml(player.id)}" title="Autofill priority: ${priority.label} · Saved for this scrim" aria-label="Autofill priority for ${escapeHtml(player.name)}: ${priority.label}"> <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h7m4 0h5M4 17h2m4 0h10"/><circle cx="13" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>${priority.label}</span></button></div>
       <span class="card-roles">${roleBadges(player, choices) || '<span class="muted small">No roles set</span>'}</span>
@@ -337,25 +341,32 @@ function playerCard(attendee) {
 
 function renderBoard() {
   const focused = document.activeElement;
-  const focusKey = ['present', 'assignment', 'quickAssign', 'copyPlayer', 'emptyRole'].find(key => focused?.dataset[key]);
+  const focusKey = ['present', 'assignment', 'quickAssign', 'copyPlayer', 'emptyRole', 'slotRoles'].find(key => focused?.dataset[key]);
   const focusValue = focused?.dataset[focusKey];
   const attendees = sortedAttendees(state);
   if (!attendees.some(attendee => attendee.playerId === choosingPlayerId)) choosingPlayerId = '';
-  if (currentSession(state).lineup[choosingRole]) choosingRole = '';
+  if (currentSession(state).lineup[choosingRole]?.playerId) choosingRole = '';
   const choices = choosingPlayerId ? assignmentChoices(state, choosingPlayerId) : [];
   element('board').classList.toggle('choosing-role', Boolean(choosingPlayerId));
-  element('role-choice-text').textContent = choosingPlayerId ? `Choose a highlighted role for ${playerById(choosingPlayerId).name}. Press Escape or click the player again to cancel.` : choosingRole ? `Choose a player for ${choosingRole}. Highlighted players play this role; other players can still fill. Press Escape to cancel.` : '';
+  element('role-choice-text').textContent = choosingPlayerId ? `Choose a highlighted role for ${playerById(choosingPlayerId).name}. Press Escape or click the player again to cancel.` : choosingRole ? `Choose a player for ${slotLabel(choosingRole)}. Highlighted players play this role; other players can still fill. Press Escape to cancel.` : '';
   element('board').hidden = attendees.length === 0;
   element('empty-roster').hidden = attendees.length !== 0;
   element('lineup-strip').innerHTML = ['tank', 'dps', 'support'].map(group => `<div class="lineup-group ${group}">
     <button class="group-preview" data-preview-group="${group}" aria-label="Highlight ${group === 'dps' ? 'DPS' : group} players">${roleIcon(group)}${group === 'dps' ? 'DPS' : group === 'tank' ? 'Tank' : 'Support'}</button>
-    ${ROLES.filter(role => roleGroup(role) === group).map(role => {
-    const player = playerById(currentSession(state).lineup[role]);
-    const offRole = player && !playableRoles(player).includes(role);
-    const filling = player && (player.offRoles || []).includes(role);
-    return `<button class="active-slot ${roleGroup(role)} ${offRole ? 'off-role' : ''} ${choices.includes(role) ? 'matching-option' : ''}" data-drop-role="${role}" ${choices.includes(role) ? `data-choice-role="${role}" data-choice-player="${escapeHtml(choosingPlayerId)}"` : `tabindex="${player ? '-1' : '0'}"`} ${player ? `data-slot-player="${escapeHtml(player.id)}" draggable="true"` : `data-empty-role="${role}"`} aria-label="${role} slot: ${escapeHtml(player?.name || 'empty')}${offRole ? ', unlisted' : filling ? ', fill' : ''}">
-      <span class="slot-role">${roleIcon(roleGroup(role))}${role}</span><span class="slot-name">${escapeHtml(player?.name || 'Empty')}</span>${offRole ? '<span class="off-role-badge">Unlisted</span>' : filling ? '<span class="fill-slot-badge">Fill</span>' : ''}
-    </button>`;
+    ${SLOTS.filter(role => slotGroup(role) === group).map(role => {
+    const player = playerById(currentSession(state).lineup[role]?.playerId);
+    const offRole = player && !rolesInclude(playableRoles(player), playedRoles(currentSession(state), role, player));
+    const filling = player && rolesInclude((player.offRoles || []), playedRoles(currentSession(state), role, player));
+    const pair = group === 'dps' ? ['HSDPS', 'FDPS'] : ['MS', 'FS'];
+    const allowedRoles = slotRoles(currentSession(state), role);
+    const actualRole = playedRoles(currentSession(state), role, player);
+    const resolved = player && actualRole.length === 1;
+    const roleText = allowedRoles.map((part, index) => `${index ? `<span class="${resolved ? 'slot-role-muted' : ''}"> / </span>` : ''}<span class="${resolved && part !== actualRole[0] ? 'slot-role-muted' : ''}">${part}</span>`).join('');
+    const selected = pair.filter(part => allowedRoles.includes(part)).join(',');
+    const roleControl = role === 'tank' ? '' : `<select class="slot-role-select" data-slot-roles="${role}" aria-label="${group === 'dps' ? 'DPS' : 'Support'} ${['dps1', 'support1'].includes(role) ? 1 : 2} roles">${[pair.slice(0, 1), pair.slice(1), pair].map(roles => `<option value="${roles.join(',')}" ${roles.join(',') === selected ? 'selected' : ''}>${roles.join(' / ')}</option>`).join('')}</select>`;
+    return `<div class="lineup-slot ${role === 'tank' ? 'tank-slot' : 'configurable-slot'}">${roleControl}<button class="active-slot ${slotGroup(role)} ${offRole ? 'off-role' : ''} ${choices.includes(role) ? 'matching-option' : ''}" data-drop-role="${role}" ${choices.includes(role) ? `data-choice-role="${role}" data-choice-player="${escapeHtml(choosingPlayerId)}"` : `tabindex="${player ? '-1' : '0'}"`} ${player ? `data-slot-player="${escapeHtml(player.id)}" draggable="true"` : `data-empty-role="${role}"`} aria-label="${slotLabel(role)} slot: ${escapeHtml(player?.name || 'empty')}${player ? `, playing ${roleLabel(actualRole)}` : ''}${offRole ? ', unlisted' : filling ? ', fill' : ''}">
+      <span class="slot-role">${roleIcon(group)}<span class="slot-role-label">${roleText}</span>${role === 'tank' ? '' : '<svg class="slot-role-chevron" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="m3 4.5 3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'}</span><span class="slot-name">${escapeHtml(player?.name || 'Empty')}</span>${offRole ? '<span class="off-role-badge">Unlisted</span>' : filling ? '<span class="fill-slot-badge">Fill</span>' : ''}
+    </button></div>`;
   }).join('')}</div>`).join('');
   element('player-roster').innerHTML = attendees.map(playerCard).join('') + `<button class="add-player-row" data-open-directory>${uiIcon('plus', 20)} Add player</button>`;
   const status = lineupStatus(state);
@@ -389,11 +400,11 @@ function applyRolePreview() {
   }
   for (const row of element('player-roster').querySelectorAll('[data-player-card]')) {
     const player = playerById(row.dataset.playerCard);
-    const matchesRole = playerRole => playerRole === role || roleGroup(playerRole) === role;
+    const matchesRole = playerRole => (SLOTS.includes(role) && slotRoles(currentSession(state), role).includes(playerRole)) || roleGroup(playerRole) === role;
     const matches = role && player.roles.some(matchesRole);
     const fills = role && !matches && (player.offRoles || []).some(matchesRole);
-    const assignedRole = ROLES.find(slot => currentSession(state).lineup[slot] === player.id);
-    const group = (matches || fills ? roleGroup(role) || role : '') || roleGroup(assignedRole) || roleGroup(player.roles[0]) || 'tank';
+    const assignedRole = SLOTS.find(slot => currentSession(state).lineup[slot]?.playerId === player.id);
+    const group = (matches || fills ? slotGroup(role) || role : '') || slotGroup(assignedRole) || roleGroup(player.roles[0]) || 'tank';
     for (const candidate of ['tank', 'dps', 'support']) row.classList.toggle(candidate, candidate === group);
     row.classList.toggle('fill-preview', Boolean(fills));
     for (const badge of row.querySelectorAll('[data-role-chip]')) badge.classList.toggle('fill-match', Boolean(fills && matchesRole(badge.dataset.roleChip)));
@@ -414,7 +425,7 @@ function quickAssignPlayer(playerId) {
   }
   if (!choices.length) openPlayer(playerId);
   else if (choices.length === 1) {
-    if (currentSession(state).lineup[choices[0]] !== playerId) placePlayer(playerId, choices[0]);
+    if (currentSession(state).lineup[choices[0]]?.playerId !== playerId) placePlayer(playerId, choices[0]);
     else notify(`Already playing ${choices[0]}.`);
   } else {
     choosingPlayerId = choosingPlayerId === playerId ? '' : playerId;
@@ -423,14 +434,14 @@ function quickAssignPlayer(playerId) {
 }
 
 function placePlayer(playerId, role, swap = false) {
-  const previous = { ...currentSession(state).lineup };
-  const previousRole = ROLES.find(slot => previous[slot] === playerId);
-  const replaced = playerById(previous[role]);
+  const previous = structuredClone(currentSession(state).lineup);
+  const previousRole = SLOTS.find(slot => previous[slot].playerId === playerId);
+  const replaced = playerById(previous[role]?.playerId);
   if (swap && replaced) swapPlayers(state, playerId, replaced.id);
   else if (role) assignPlayer(state, role, playerId, true);
   else if (previousRole) assignPlayer(state, previousRole, '');
   commit();
-  const message = role ? `${playerById(playerId).name} to ${role}${replaced && replaced.id !== playerId ? ` · ${replaced.name} to ${swap && previousRole ? previousRole : 'Bench'}` : ''}` : `${playerById(playerId).name} to Bench`;
+  const message = role ? `${playerById(playerId).name} to ${slotLabel(role)}${replaced && replaced.id !== playerId ? ` · ${replaced.name} to ${swap && previousRole ? slotLabel(previousRole) : 'Bench'}` : ''}` : `${playerById(playerId).name} to Bench`;
   notify(message, () => { currentSession(state).lineup = previous; commit(); });
 }
 
@@ -576,10 +587,10 @@ element('board').addEventListener('dragover', event => {
   event.dataTransfer.dropEffect = 'move';
   document.querySelectorAll('.drop-target').forEach(target => target.classList.remove('drop-target', 'off-role-target'));
   slot.classList.add('drop-target');
-  const role = slot.dataset.dropRole || ROLES.find(role => currentSession(state).lineup[role] === slot.dataset.playerCard);
-  const sourceRole = ROLES.find(role => currentSession(state).lineup[role] === draggedPlayerId);
-  const targetId = slot.dataset.playerCard || currentSession(state).lineup[role];
-  slot.classList.toggle('off-role-target', Boolean((role && !playableRoles(playerById(draggedPlayerId)).includes(role)) || (sourceRole && targetId && !playableRoles(playerById(targetId)).includes(sourceRole))));
+  const role = slot.dataset.dropRole || SLOTS.find(role => currentSession(state).lineup[role]?.playerId === slot.dataset.playerCard);
+  const sourceRole = SLOTS.find(role => currentSession(state).lineup[role]?.playerId === draggedPlayerId);
+  const targetId = slot.dataset.playerCard || currentSession(state).lineup[role]?.playerId;
+  slot.classList.toggle('off-role-target', Boolean((role && !rolesInclude(playableRoles(playerById(draggedPlayerId)), playedRoles(currentSession(state), role, playerById(draggedPlayerId)))) || (sourceRole && targetId && !rolesInclude(playableRoles(playerById(targetId)), playedRoles(currentSession(state), sourceRole, playerById(targetId))))));
 });
 element('board').addEventListener('dragleave', event => {
   const slot = event.target.closest('[data-drop-role], [data-player-card]');
@@ -587,7 +598,7 @@ element('board').addEventListener('dragleave', event => {
 });
 document.addEventListener('dragend', endPlayerDrag);
 document.addEventListener('dragover', event => {
-  const canBench = draggedPlayerId && ROLES.some(role => currentSession(state).lineup[role] === draggedPlayerId) && !event.target.closest('#lineup-strip, [data-player-card]');
+  const canBench = draggedPlayerId && SLOTS.some(role => currentSession(state).lineup[role]?.playerId === draggedPlayerId) && !event.target.closest('#lineup-strip, [data-player-card]');
   element('bench-drop-hint').hidden = !canBench;
   if (!canBench) return;
   event.preventDefault();
@@ -596,7 +607,7 @@ document.addEventListener('dragover', event => {
 document.addEventListener('drop', event => {
   if (!draggedPlayerId || event.target.closest('#lineup-strip, [data-player-card]')) return;
   const playerId = draggedPlayerId;
-  if (!ROLES.some(role => currentSession(state).lineup[role] === playerId)) return;
+  if (!SLOTS.some(role => currentSession(state).lineup[role]?.playerId === playerId)) return;
   event.preventDefault();
   endPlayerDrag();
   placePlayer(playerId, '');
@@ -606,15 +617,15 @@ element('board').addEventListener('drop', event => {
   const playerId = draggedPlayerId;
   if (!slot || !playerId) return;
   event.preventDefault();
-  const role = slot.dataset.dropRole || ROLES.find(role => currentSession(state).lineup[role] === slot.dataset.playerCard);
-  const sourceRole = ROLES.find(role => currentSession(state).lineup[role] === playerId);
+  const role = slot.dataset.dropRole || SLOTS.find(role => currentSession(state).lineup[role]?.playerId === slot.dataset.playerCard);
+  const sourceRole = SLOTS.find(role => currentSession(state).lineup[role]?.playerId === playerId);
   const targetId = slot.dataset.playerCard;
   endPlayerDrag();
   if (!role) {
     if (sourceRole && targetId) placePlayer(targetId, sourceRole, true);
     return;
   }
-  if (currentSession(state).lineup[role] === playerId) return;
+  if (currentSession(state).lineup[role]?.playerId === playerId) return;
   placePlayer(playerId, role, true);
 });
 
@@ -646,7 +657,7 @@ element('board').addEventListener('contextmenu', event => {
   const target = event.target.closest('[data-player-card], [data-slot-player]');
   if (!target || event.target.closest('input, select, textarea')) return;
   const playerId = target.dataset.playerCard || target.dataset.slotPlayer;
-  if (!ROLES.some(role => currentSession(state).lineup[role] === playerId)) return;
+  if (!SLOTS.some(role => currentSession(state).lineup[role]?.playerId === playerId)) return;
   event.preventDefault();
   placePlayer(playerId, '');
 });
@@ -734,6 +745,13 @@ document.addEventListener('click', async event => {
 
 document.addEventListener('change', async event => {
   const target = event.target;
+  if (target.dataset.slotRoles) {
+    setSlotRoles(state, target.dataset.slotRoles, target.value.split(','));
+    choosingRole = '';
+    choosingPlayerId = '';
+    commit();
+    document.querySelector(`[data-slot-roles="${target.dataset.slotRoles}"]`)?.focus();
+  }
   if (target.dataset.assignment) placePlayer(target.dataset.assignment, target.value);
   if (target.dataset.present) {
     const playerId = target.dataset.present;
@@ -804,7 +822,7 @@ element('lineup-swaps').onclick = async event => {
     const number = currentSession(state).activeGame ? currentSession(state).games.length + 1 : currentSession(state).games.length;
     const swapArrow = '<svg class="swap-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>';
     element('swaps-source').innerHTML = `<span>Game ${number}${currentSession(state).activeGame ? ' · In progress' : ' · Completed'}${referenceName(source.map) ? ` · ${escapeHtml(referenceName(source.map))}` : ''}</span><span class="swaps-destination">${swapArrow} Current lineup</span>`;
-    const playerLabel = player => `<strong>${escapeHtml(player.battletag?.split('#')[0].trim() || player.name)}</strong><small class="${roleGroup(player.role)}">${escapeHtml(player.role)}</small>`;
+    const playerLabel = player => `<strong>${escapeHtml(player.battletag?.split('#')[0].trim() || player.name)}</strong><small class="${slotGroup(player.slot)}">${escapeHtml(roleLabel(player.roles))}</small>`;
     element('swaps-list').innerHTML = pairs.length ? '<div class="swap-labels"><span>In</span><span></span><span>Out</span></div>' + pairs.map(pair => `<div class="swap-pair"><span>${playerLabel(pair.incoming)}</span>${swapArrow}<span>${playerLabel(pair.outgoing)}</span></div>`).join('') : '<p class="swaps-empty">No player swaps needed.</p>';
     element('swaps-message').value = message;
     element('swaps-message-field').hidden = !pairs.length;
@@ -826,14 +844,14 @@ async function copySwaps() {
 }
 element('copy-swaps').onclick = copySwaps;
 element('clear-lineup').onclick = () => {
-  const previous = { ...currentSession(state).lineup };
-  currentSession(state).lineup = emptyLineup();
+  const previous = structuredClone(currentSession(state).lineup);
+  for (const slot of Object.values(currentSession(state).lineup)) slot.playerId = '';
   commit();
   notify('Lineup cleared.', () => { currentSession(state).lineup = previous; commit(); });
 };
 element('autofill-lineup').onclick = () => {
   try {
-    const previous = { ...currentSession(state).lineup };
+    const previous = structuredClone(currentSession(state).lineup);
     currentSession(state).lineup = autofillLineup(state);
     commit();
     notify('Lineup filled.', () => { currentSession(state).lineup = previous; commit(); });
@@ -914,7 +932,7 @@ element('scrim-time-button').onclick = () => {
     currentSession(state).scheduledAt = defaultScrimTime();
     commit();
   }
-  element('scrim-time-input').value = easternInput(currentSession(state).scheduledAt);
+  element('scrim-time-input').value = localInput(currentSession(state).scheduledAt);
   element('scrim-time-error').hidden = true;
   element('scrim-time-dialog').showModal();
 };
@@ -925,7 +943,7 @@ element('scrim-time-button').oncontextmenu = event => {
 };
 element('scrim-time-input').onchange = () => {
   try {
-    currentSession(state).scheduledAt = fromEasternInput(element('scrim-time-input').value);
+    currentSession(state).scheduledAt = fromLocalInput(element('scrim-time-input').value);
     element('scrim-time-error').hidden = true;
     commit();
   } catch (error) {

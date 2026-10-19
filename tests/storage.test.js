@@ -41,10 +41,10 @@ test('exports require a supported envelope, including partial exports', () => {
   const exported = exportData(newState(), { players: true });
   assert.equal(exported.format, 'scrims-helper-export');
   assert.equal(exported.version, 1);
-  assert.equal(exported.schema, 'scrims-helper-v1');
+  assert.equal(Object.hasOwn(exported, 'schema'), false);
+  assert.throws(() => readImport({ ...exported, schema: 'scrims-helper-v1' }), /Unrecognized export fields/);
   assert.deepEqual(readImport(JSON.parse(JSON.stringify(exported))), { players: [], statuses: newState().statuses, statusOrder: newState().statusOrder });
   for (const input of [
-    { format: 'scrims-helper-export', version: 1, data: { players: [] } },
     { ...exported, version: 99 }, { version: 1 }, newState(),
   ]) assert.throws(() => readImport(input), /unsupported format/);
 });

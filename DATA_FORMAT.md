@@ -4,7 +4,9 @@ This is the format being finalized before the first public release. Earlier
 prerelease browser saves and exports may also say version 1 but use a different
 shape; they are intentionally unsupported. The app validates this single format
 strictly and does not migrate or repair older records. Rejected saved data is left
-untouched. After public release, versioned formats will retain backward support.
+untouched. Version 1 remains the prerelease identifier until public release. That release
+will establish the v1 compatibility baseline; incompatible changes after it
+will receive a new version and retain backward support.
 
 ## Browser storage
 
@@ -60,8 +62,9 @@ Each player has:
 
 An empty roles list is valid, including for fill-only players. offRoles is an
 additive v1 field; earlier v1 saves remain valid without it. Preferences classify
-historical assignments at scheduling time: current main roles earn preferred
-playtime credit; all other assignments count as fills. No classification snapshot
+historical assignments at scheduling time: assignments whose possible roles are
+all current main roles earn preferred playtime credit; assignments with no
+current main roles count as fills. Mixed standing stays unresolved. No classification snapshot
 is stored, so changing preferences recalculates scheduling credit and fill burden.
 Actual game counts remain unchanged. Role groups used for statistics are derived:
 Tank → tank; HSDPS/FDPS → DPS; MS/FS → support.
@@ -75,9 +78,9 @@ initialized), and `session`. Session contains:
 | --- | --- |
 | title | Scrim name, possibly empty |
 | contact | Contact BattleTag, possibly empty |
-| scheduledAt | Optional canonical UTC ISO timestamp (e.g. `2026-10-03T00:00:00.000Z`). Omitted means unscheduled. New scrims default to 8 PM on today's Eastern calendar date. |
+| scheduledAt | Optional canonical UTC ISO timestamp (e.g. `2026-10-03T00:00:00.000Z`). Omitted means unscheduled. New scrims default to 8 PM on today's local calendar date. Display and editing use the browser's local timezone; the stored instant remains UTC. |
 | attendees | Unique { playerId, present, priority } entries |
-| lineup | Object with Tank, HSDPS, FDPS, MS, FS keys |
+| lineup | Object with exactly tank, dps1, dps2, support1, support2 keys, each containing { allowedRoles, playerId } |
 | draft | Upcoming { map, mode, ourBan, theirBan } |
 | activeGame | Game record, or null |
 | games | Completed game records, oldest first |
@@ -93,9 +96,21 @@ that scrim. These values map to exact integer numerators and denominators.
 Priority affects autofill and roster sorting, never raw statistics. Transfers retain
 it; copied setups and removed/re-added attendees snapshot the current default.
 The field is required in every saved attendee and export; omitted values are rejected.
-Lineup values are attendee
-player IDs or empty strings for unfilled slots; players cannot appear twice.
+Each lineup slot has a required nonempty `allowedRoles` array of unique role
+identifiers from its broad group, and a required `playerId` containing an attendee
+ID or an empty string. Players cannot appear twice. Tank accepts only Tank,
+DPS slots accept HSDPS and/or FDPS, and support slots accept MS and/or FS.
 Absent and off-role assignments are allowed in the planned lineup.
+
+```json
+"dps1": { "allowedRoles": ["HSDPS", "FDPS"], "playerId": "player-123" }
+```
+
+New scrims create the default one-of-each role layout explicitly. Requirements
+are always stored, never inferred from slot names or supplied when loading.
+Clearing player assignments retains requirements; copying setup copies them
+without sharing arrays. The legacy role-keyed lineup and `roleOptions` field
+are not accepted.
 
 ### Games
 
@@ -105,8 +120,35 @@ Games contain `id`, `map`, `mode`, `ourBan`, `theirBan`, `outcome`,
 - outcome: win, loss, draw, or empty if not recorded.
 - playedAt: ISO completion timestamp; while active, initially the start time.
 - startedAt: ISO start timestamp, required for an active game.
-- lineup: exactly five { role, playerId, name, battletag } snapshots,
-  one per slot, without duplicate players.
+- lineup: exactly five { slot, roles, playerId, name, battletag } snapshots,
+  one for each neutral slot ID, without duplicate slots or players. `roles` is a
+  required nonempty unique array of possible played roles within that slot's
+  broad group. One role is resolved; two means unresolved. Subroles may repeat
+  across slots (for example two HSDPS or two FS).
+
+```json
+{
+  "slot": "dps1",
+  "roles": ["HSDPS", "FDPS"],
+  "playerId": "player-123",
+  "name": "Alex",
+  "battletag": "Alex#1234"
+}
+```
+
+Snapshot `roles` describe what may have been played, not what the slot allowed.
+A hitscan specialist in a flexible slot records `["HSDPS"]`. Snapshots do not
+reference current requirements. Role labels such as “HSDPS / FDPS” are derived
+for display; combined strings and the legacy singular `role` field are invalid.
+Role-array order has no semantic meaning; writers use directory-role order.
+
+Unresolved history contributes to total and broad-role counts. It counts as
+main-role play only if all alternatives are current main roles, and as fill play
+only if none are current main roles. If later preference edits split its standing,
+main/fill status remains unresolved until clarified; the saved role is unchanged.
+Autofill excludes unresolved history from subrole counts and gives unresolved
+proposed assignments a neutral subrole score. Explicit game-role edits stay
+within the same broad group and do not change upcoming slot requirements.
 
 Historical snapshots need not reference a player still in the directory.
 Renaming or deleting a directory player does not rewrite recorded names,
@@ -166,18 +208,19 @@ customGameCode is shared across scrims; blank/whitespace uses the app default
 {
   "format": "scrims-helper-export",
   "version": 1,
-  "schema": "scrims-helper-v1",
   "data": {
     "players": [],
     "statuses": [],
-  "statusOrder": ["default"],
+    "statusOrder": ["default"],
     "mapPoolPresets": [],
     "customGameCode": ""
   }
 }
 ```
 
-The schema marker is required for all exports, including partial exports.
+The envelope contains exactly `format`, `version`, and `data`. There is no
+separate schema marker. The former `schema` field is rejected as an unknown
+field, including in partial exports.
 
 data includes only selected categories, with at least one present:
 players, scrims, mapPoolPresets, customGameCode. Scrims are represented as

@@ -1,3 +1,4 @@
+import { defaultSlot, snapshotRole } from './fixtures.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { currentSession, ROLES, newState, newSession, allScrims, createScrim, switchScrim, deleteScrim, startGame, finishGame, gamesFor, removeAttendee, validateState } from '../model.js';
@@ -7,7 +8,7 @@ function populatedState() {
   for (const role of ROLES) {
     state.players.push({ id: role, name: role, battletag: `${role}#1234`, roles: [role], status: 'default', notes: '' });
     currentSession(state).attendees.push({ playerId: role, present: true, priority: '1' });
-    currentSession(state).lineup[role] = role;
+    currentSession(state).lineup[defaultSlot(role)].playerId = role;
   }
   currentSession(state).title = 'First scrim';
   currentSession(state).contact = 'Coach#1234';

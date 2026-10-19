@@ -24,16 +24,33 @@ build step. Data stays in your browser; exports let you back it up or share it.
 The top bar shows attendance, games played, W/L/D, and copy buttons for the
 contact BattleTag and custom game code. **Flip coin** briefly shows a result.
 
-The scrim time in the top bar opens an Eastern-time picker. New scrims default
-to 8 PM Eastern that day; daylight-saving time is handled automatically. The
+The scrim time in the top bar opens a local-time picker. New scrims default
+to 8 PM on today's date in your browser’s timezone; daylight-saving time is handled automatically. The
 adjacent copy button copies a Discord short-time timestamp (`<t:…:t>`), displayed
 in the reader's local timezone. Changes save automatically and travel with scrim
-exports. Right-click the time to clear it; unscheduled scrims show **Set time**.
+exports as UTC timestamps. Existing scrims display in each viewer’s local timezone,
+with a timezone abbreviation beside the time. Right-click the time to clear it; unscheduled scrims show **Set time**.
 During the repeated hour
 when daylight saving ends, the earlier occurrence is used; nonexistent spring
 times are rejected.
 
 ### Lineup and playtime
+
+Use the role dropdown on each lineup slot to choose HSDPS, FDPS, or either
+for DPS, and MS, FS, or either for support. For double hitscan, set both DPS
+slots to HSDPS. To allow either MS + FS or double FS, set Support 1 to
+**MS / FS** and Support 2 to **FS**. Defaults remain one of each subrole.
+Settings save per scrim and carry over when copying its setup. Autofill and
+assignment highlights use these choices; game history records each player's
+role, keeping **HSDPS / FDPS** or **MS / FS** when unresolved. A sole main role
+wins over a fill or unlisted role, and a sole declared fill wins over an unlisted
+role. Equally ranked alternatives stay unresolved. When a role is known, the
+unused alternative in the slot header is dimmed.
+Unresolved games count toward total and broad-role playtime, and toward main-role
+playtime when both alternatives are main roles. They do not affect subrole
+balancing. Use the role dropdown in the game editor to clarify a recorded game
+without changing the slot's allowed roles.
+Changing choices affects the planned lineup, leaving recorded games unchanged.
 
 - Click a player for their single main role or single open main-role slot.
   If there are several choices, select a highlighted slot. You can also click

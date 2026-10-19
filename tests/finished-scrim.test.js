@@ -1,3 +1,4 @@
+import { defaultSlot, snapshotRole } from './fixtures.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newState, currentSession, setScrimFinished, createScrim, ROLES, startGame, finishGame, reopenLastGame, validateState } from '../model.js';
@@ -23,7 +24,7 @@ test('an active game must finish first; reopening a game resumes the scrim', () 
   for (const role of ROLES) {
     state.players.push({ id: role, name: role, battletag: '', roles: [role], status: 'default', notes: '' });
     session.attendees.push({ playerId: role, present: true, priority: '1' });
-    session.lineup[role] = role;
+    session.lineup[defaultSlot(role)].playerId = role;
   }
   startGame(state, 'game', '2026-09-30T12:00:00Z');
   assert.throws(() => setScrimFinished(state, true));
