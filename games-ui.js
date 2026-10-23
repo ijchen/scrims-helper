@@ -297,11 +297,13 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
     element('catalog-custom').textContent = `Use custom ${maps ? 'map' : 'hero'}: ${query.trim()}`;
   }
 
-  function openPicker(id, field, initialFilter = '') {
+  function openPicker(id, field, initialFilter) {
     if (!getGame(id)) return;
     if (!id) { prepareNext = true; render(); jumpToGame(''); }
     picker = { id, field };
-    filter = initialFilter;
+    const session = currentSession(getState());
+    const firstGameId = session.games[0]?.id || session.activeGame?.id || '';
+    filter = initialFilter ?? (field === 'map' && id === firstGameId ? 'Control' : '');
     element('catalog-heading').textContent = field === 'map' ? 'Choose map' : field === 'ourBan' ? 'Our hero ban' : 'Their hero ban';
     element('catalog-search').value = '';
     element('catalog-search').placeholder = field === 'map' ? 'Search maps' : 'Search heroes';
