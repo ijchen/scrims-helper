@@ -287,7 +287,11 @@ export function createGamesUI({ getState, save, action, roleIcon, confirmAction 
       const candidate = { ...getGame(picker.id), [picker.field]: { id: item.id, name: item.name }, ...(maps ? { mode: item.mode } : {}) };
       const warnings = gameWarnings(currentSession(getState()), candidate, picker.id)[picker.field];
       return { item, warnings };
-    }).sort((first, second) => Number(Boolean(first.warnings.length)) - Number(Boolean(second.warnings.length)));
+    }).sort((first, second) => {
+      const warningOrder = Number(Boolean(first.warnings.length)) - Number(Boolean(second.warnings.length));
+      if (warningOrder || !maps || filter || query.trim()) return warningOrder;
+      return MODES.indexOf(first.item.mode) - MODES.indexOf(second.item.mode) || first.item.name.localeCompare(second.item.name);
+    });
     element('catalog-filters').innerHTML = [['', 'All'], ...(maps ? MODES.map(mode => [mode, mode]) : [['tank', 'Tank'], ['dps', 'DPS'], ['support', 'Support']])].map(([value, label]) => `<button class="quiet" data-catalog-filter="${value}" aria-pressed="${filter === value}">${label}</button>`).join('');
     element('catalog-results').classList.toggle('map-results', maps);
     element('catalog-results').innerHTML = matches.map(({ item, warnings }) => {
